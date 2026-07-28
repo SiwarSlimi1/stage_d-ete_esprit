@@ -43,7 +43,7 @@ def process_document(image_path: Path) -> dict:
             "source_image": str(image_path),
         }
 
-    result = extractor.extract(document.raw_text)
+    result = extractor.extract(document.raw_text, document.word_lines)
     result["classification_confidence"] = document.classification_confidence
     result["source_image"] = str(image_path)
     return result

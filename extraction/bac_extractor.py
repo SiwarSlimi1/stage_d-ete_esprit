@@ -6,7 +6,7 @@ class BacExtractor(BaseExtractor):
     document_type = "bac"
     required_fields = ["nom", "prenom", "annee_obtention"]
 
-    def _extract_fields(self, text: str) -> dict:
+    def _extract_fields(self, text: str, lines: list[list[str]] | None = None) -> dict:
         return {
             "nom": extract_after_label(text, ["nom"]),
             "prenom": extract_after_label(text, ["prenom"]),

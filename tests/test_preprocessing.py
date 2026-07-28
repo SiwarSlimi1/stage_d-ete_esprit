@@ -61,4 +61,4 @@ def test_preprocess_pipeline_on_real_sample(sample_documents):
     image = load_image(sample_documents["cin"])
     processed = preprocess_pipeline(image)
     assert processed.ndim == 2
-    assert set(np.unique(processed)).issubset({0, 255})
+    assert processed.dtype == np.uint8

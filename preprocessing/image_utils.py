@@ -30,8 +30,16 @@ def to_grayscale(image: np.ndarray) -> np.ndarray:
 
 
 def equalize_contrast(gray_image: np.ndarray) -> np.ndarray:
-    """Égalisation d'histogramme pour compenser un scan sous/surexposé."""
-    return cv2.equalizeHist(gray_image)
+    """Égalisation d'histogramme adaptative (CLAHE) pour compenser un scan sous/surexposé.
+
+    Une égalisation globale (cv2.equalizeHist) amplifie le contraste uniformément sur
+    toute l'image : sur une vraie photo de document à éclairage inégal (reflets, ombres),
+    elle sur-amplifie le bruit local au point de détruire le texte. CLAHE égalise par
+    tuiles locales avec une limite de contraste, ce qui la rend beaucoup plus robuste
+    sur des photos réelles tout en restant efficace sur des scans propres.
+    """
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    return clahe.apply(gray_image)
 
 
 def adjust_gamma(gray_image: np.ndarray, gamma: float = 1.0) -> np.ndarray:
@@ -80,7 +88,14 @@ def crop_to_content(gray_image: np.ndarray, margin: int = 15) -> np.ndarray:
 
 def preprocess_pipeline(image: np.ndarray) -> np.ndarray:
     """Chaîne complète de prétraitement avant OCR (contraste -> bruit -> deskew ->
-    recadrage -> redimensionnement -> binarisation), cf. rapport §3.2.1."""
+    recadrage -> redimensionnement), cf. rapport §3.2.1.
+
+    La binarisation globale (Otsu) reste disponible via binarize(), mais n'est plus
+    appliquée par défaut : sur de vraies photos de documents (éclairage inégal), un
+    seuillage global fait disparaître le texte, alors que Tesseract gère très bien une
+    image en niveaux de gris correctement contrastée (vérifié à la fois sur les
+    documents synthétiques et sur de vraies cartes d'identité tunisiennes).
+    """
     from preprocessing.deskew import deskew  # import local pour éviter le cycle
 
     gray = to_grayscale(image)
@@ -88,5 +103,4 @@ def preprocess_pipeline(image: np.ndarray) -> np.ndarray:
     gray = denoise(gray)
     gray = deskew(gray)
     gray = crop_to_content(gray)
-    gray = resize_for_ocr(gray)
-    return binarize(gray)
+    return resize_for_ocr(gray)

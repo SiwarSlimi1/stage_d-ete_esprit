@@ -18,6 +18,17 @@ KEYWORD_RULES: dict[str, list[tuple[str, int]]] = {
         ("carte d'identite", 3),
         ("n cin", 2),
         ("cin", 1),
+        # Carte d'identité tunisienne en arabe (rapport §2.2.1 : détection de nationalité
+        # à partir de documents dont l'alphabet peut être arabe). Plusieurs variantes sont
+        # listées pour tolérer les erreurs de lecture courantes de l'OCR sur ce script.
+        ("بطاقة التعريف الوطنية", 5),
+        ("بطاقة تعريف", 4),
+        ("التعريف الوطنية", 4),
+        ("التعرف الوطني", 3),
+        ("تعريف", 2),
+        ("التعرف", 2),
+        ("بطاقة", 1),
+        ("الجمهورية التونسية", 2),
     ],
     "acte_naissance": [
         ("acte de naissance", 5),

@@ -39,3 +39,29 @@ def extract_text_with_confidence(image: np.ndarray, lang: str = OCR_LANGUAGES) -
         "mean_confidence": round(mean_confidence, 2),
         "words": words,
     }
+
+
+def extract_lines(image: np.ndarray, lang: str = OCR_LANGUAGES, psm: int = 4) -> list[list[str]]:
+    """Retourne le texte OCR regroupé par ligne, chaque ligne étant la liste de ses
+    mots triés de gauche à droite (coordonnées image).
+
+    Utilisé pour l'extraction positionnelle sur les documents en écriture arabe
+    (RTL), où le libellé d'un champ est imprimé à droite de la valeur sur la même
+    ligne : le texte brut linéaire (extract_text) ne permet pas de retrouver cette
+    relation, alors que les coordonnées des mots le permettent.
+    """
+    data = pytesseract.image_to_data(image, lang=lang, config=f"--psm {psm}", output_type=Output.DICT)
+
+    grouped: dict[tuple, list[tuple[int, str]]] = {}
+    for i, text in enumerate(data["text"]):
+        text = text.strip()
+        if not text or float(data["conf"][i]) < 0:
+            continue
+        key = (data["block_num"][i], data["par_num"][i], data["line_num"][i])
+        grouped.setdefault(key, []).append((data["left"][i], text))
+
+    lines = []
+    for key in sorted(grouped.keys()):
+        words = [word for _, word in sorted(grouped[key], key=lambda w: w[0])]
+        lines.append(words)
+    return lines

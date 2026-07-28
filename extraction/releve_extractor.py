@@ -36,7 +36,7 @@ class ReleveExtractor(BaseExtractor):
     document_type = "releve_notes"
     required_fields = ["annee_universitaire", "moyenne"]
 
-    def _extract_fields(self, text: str) -> dict:
+    def _extract_fields(self, text: str, lines: list[list[str]] | None = None) -> dict:
         return {
             "annee_universitaire": extract_after_label(text, ["annee universitaire"]),
             "etudiant": extract_after_label(text, ["etudiant"]),
