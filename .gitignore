@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 data/reports/*.json
 .pytest_cache/
+.claude/
 
 # Documents personnels/reels deposes localement pour des tests manuels
 # (jamais de vrais documents d'identite dans ce depot public)

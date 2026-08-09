@@ -25,7 +25,7 @@ class ActeNaissanceExtractor(BaseExtractor):
     document_type = "acte_naissance"
     required_fields = ["nom", "prenom", "date_naissance"]
 
-    def _extract_fields(self, text: str, lines: list[list[str]] | None = None) -> dict:
+    def _extract_fields(self, text: str, lines: list[dict] | None = None, image=None) -> dict:
         # 1) Format "Label: valeur" (documents propres, une ligne par champ).
         fields = {
             "nom": extract_after_label(text, ["nom"]),

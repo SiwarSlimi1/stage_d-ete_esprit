@@ -15,7 +15,13 @@ import re
 from abc import ABC, abstractmethod
 from difflib import SequenceMatcher
 
+import numpy as np
+
 from ocr.text_normalization import normalize
+
+# Une "ligne" positionnelle, telle que produite par ocr.tesseract_engine.extract_lines :
+# {"words": list[str], "top": int, "bottom": int, "left": int, "right": int}
+Line = dict
 
 
 def extract_after_label(text: str, labels: list[str]) -> str | None:
@@ -55,21 +61,22 @@ def _strip_footnote_marks(value: str) -> str:
     return re.sub(r"[\*®©\s]+$", "", value).strip()
 
 
-def extract_value_left_of_label(lines: list[list[str]], label_variants: list[str]) -> str | None:
+def extract_value_left_of_label(lines: list[Line], label_variants: list[str]) -> str | None:
     """Extraction positionnelle pour les documents en écriture arabe (RTL).
 
     Sur une carte d'identité tunisienne, le libellé d'un champ (ex. "الاسم") est
     imprimé à droite de sa valeur, sur la même ligne. Le texte OCR brut linéaire
     ne permet pas de retrouver cette relation ; les coordonnées des mots le
-    permettent : `lines` contient, pour chaque ligne, les mots triés de gauche à
-    droite (coordonnées image). Le libellé correspond donc aux derniers mots de
-    la ligne, et la valeur - une fois ces mots retirés - doit être relue dans
+    permettent : chaque ligne fournit ses mots triés de gauche à droite
+    (coordonnées image). Le libellé correspond donc aux derniers mots de la
+    ligne, et la valeur - une fois ces mots retirés - doit être relue dans
     l'ordre inverse pour respecter le sens de lecture RTL.
 
     La comparaison au libellé tolère les erreurs d'OCR courantes sur l'écriture
     arabe via une similarité approximative plutôt qu'une égalité stricte.
     """
-    for words in lines:
+    for line in lines:
+        words = line["words"]
         for label in label_variants:
             label_word_count = len(label.split())
             if len(words) <= label_word_count:
@@ -82,10 +89,11 @@ def extract_value_left_of_label(lines: list[list[str]], label_variants: list[str
     return None
 
 
-def extract_standalone_number(lines: list[list[str]], min_digits: int = 7, max_digits: int = 9) -> str | None:
+def extract_standalone_number(lines: list[Line], min_digits: int = 7, max_digits: int = 9) -> str | None:
     """Repère un numéro isolé sur sa propre ligne (ex. numéro de CIN), un motif
     fréquent sur les documents officiels indépendamment de la langue."""
-    for words in lines:
+    for line in lines:
+        words = line["words"]
         if len(words) != 1:
             continue
         candidate = words[0]
@@ -95,13 +103,14 @@ def extract_standalone_number(lines: list[list[str]], min_digits: int = 7, max_d
 
 
 def extract_value_right_of_label(
-    lines: list[list[str]], label_variants: list[str], threshold: float = 0.75
+    lines: list[Line], label_variants: list[str], threshold: float = 0.75
 ) -> str | None:
     """Extraction positionnelle pour les formulaires en écriture latine (LTR), où
     le libellé précède sa valeur sur la même ligne (ex. tableau d'un acte de
     naissance : "PRENOMS MOUNIR"). Symétrique de extract_value_left_of_label,
     utilisée pour les documents en écriture arabe."""
-    for words in lines:
+    for line in lines:
+        words = line["words"]
         for label in label_variants:
             label_word_count = len(label.split())
             if len(words) <= label_word_count:
@@ -115,21 +124,22 @@ def extract_value_right_of_label(
 
 
 def extract_value_from_adjacent_line(
-    lines: list[list[str]], label_variants: list[str], offset: int = -1, threshold: float = 0.75
+    lines: list[Line], label_variants: list[str], offset: int = -1, threshold: float = 0.75
 ) -> str | None:
     """Repli pour les tableaux dont l'analyse de mise en page sépare un libellé de
     sa valeur sur deux lignes OCR distinctes (ex. "NOM" seul sur une ligne, la
     valeur "BARAKATI" isolée sur la ligne voisine). Ne s'applique qu'aux lignes ne
     contenant que le libellé, pour éviter de capturer la valeur d'un autre champ."""
-    for i, words in enumerate(lines):
+    for i, line in enumerate(lines):
+        words = line["words"]
         if len(words) > 2:
             continue
         joined = normalize(" ".join(words))
         for label in label_variants:
             if _similar(joined, normalize(label), threshold):
                 neighbour_index = i + offset
-                if 0 <= neighbour_index < len(lines) and lines[neighbour_index]:
-                    return _strip_footnote_marks(" ".join(lines[neighbour_index]))
+                if 0 <= neighbour_index < len(lines) and lines[neighbour_index]["words"]:
+                    return _strip_footnote_marks(" ".join(lines[neighbour_index]["words"]))
     return None
 
 
@@ -140,18 +150,23 @@ class BaseExtractor(ABC):
     required_fields: list[str] = []
 
     @abstractmethod
-    def _extract_fields(self, text: str, lines: list[list[str]] | None = None) -> dict:
+    def _extract_fields(self, text: str, lines: list[Line] | None = None, image: np.ndarray | None = None) -> dict:
         """Extrait les champs propres au type de document depuis le texte OCR brut.
 
-        `lines` (optionnel) fournit le même texte regroupé par ligne, mots triés par
-        position horizontale - nécessaire uniquement aux extracteurs qui utilisent
-        extract_value_left_of_label (documents en écriture arabe, cf. CINExtractor)."""
+        `lines` (optionnel) fournit le même texte regroupé par ligne, mots triés
+        par position horizontale, avec la boîte englobante de chaque ligne -
+        nécessaire aux extracteurs positionnels (documents en écriture arabe ou
+        en tableau, cf. CINExtractor, ActeNaissanceExtractor).
+
+        `image` (optionnel) fournit l'image prétraitée elle-même, pour une
+        seconde passe OCR ciblée (zoom) sur une zone trop dégradée en une seule
+        passe globale (cf. ocr.tesseract_engine.zoom_ocr_text)."""
 
     def _build_warnings(self, text: str, fields: dict) -> list[str]:
         return []
 
-    def extract(self, text: str, lines: list[list[str]] | None = None) -> dict:
-        fields = {k: v for k, v in self._extract_fields(text, lines or []).items() if v}
+    def extract(self, text: str, lines: list[Line] | None = None, image: np.ndarray | None = None) -> dict:
+        fields = {k: v for k, v in self._extract_fields(text, lines or [], image).items() if v}
         missing_fields = [f for f in self.required_fields if not fields.get(f)]
         warnings = self._build_warnings(text, fields)
 

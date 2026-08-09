@@ -1,5 +1,6 @@
 """Structures de données partagées entre les modules (rapport §3.5, diagramme de classes)."""
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -11,6 +12,7 @@ class Document:
     doc_type: str = "inconnu"
     classification_confidence: float = 0.0
     word_lines: list = field(default_factory=list)
+    processed_image: Any = None
 
     def preprocess(self):
         from preprocessing.image_utils import load_image, preprocess_pipeline
@@ -21,10 +23,13 @@ class Document:
     def run_ocr(self, processed_image) -> None:
         from ocr.tesseract_engine import extract_lines, extract_text
 
+        self.processed_image = processed_image
         self.raw_text = extract_text(processed_image)
-        # Regroupement positionnel (mots triés par ligne), nécessaire à l'extraction
-        # des documents en écriture arabe où le libellé d'un champ se trouve à
-        # droite de sa valeur sur la même ligne (cf. extraction/base_extractor.py).
+        # Regroupement positionnel (mots triés par ligne, avec leur boîte
+        # englobante), nécessaire à l'extraction des documents en écriture arabe
+        # où le libellé d'un champ se trouve à droite de sa valeur sur la même
+        # ligne, ainsi qu'à une éventuelle seconde passe OCR ciblée (zoom) sur une
+        # zone dégradée (cf. extraction/base_extractor.py, extraction/cin_extractor.py).
         self.word_lines = extract_lines(processed_image)
 
 
