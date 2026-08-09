@@ -9,6 +9,7 @@ rapport de vérification destiné à assister les enseignants. Chaque type de
 document du dossier (CIN, acte de naissance, bac, licence, relevé de notes) a
 son propre emplacement de dépôt, à l'image d'un vrai dossier de candidature.
 """
+import base64
 import json
 import tempfile
 from pathlib import Path
@@ -23,6 +24,14 @@ from preprocessing.image_utils import load_image, preprocess_pipeline
 st.set_page_config(page_title="POC Vérification IA — ESPRIT", page_icon="📄", layout="wide")
 
 ESPRIT_RED = "#c1272d"
+LOGO_PATH = Path(__file__).parent / "assets" / "logo_esprit.png"
+
+
+def _logo_data_uri() -> str | None:
+    if not LOGO_PATH.exists():
+        return None
+    encoded = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
 
 STATUS_LABELS = {
     "success": ("🟢", "Complet", "status-ok"),
@@ -39,6 +48,13 @@ DOCUMENT_SLOTS = [
 ]
 
 # ---------- Thème visuel inspiré de l'identité ESPRIT (rouge/blanc/gris) ----------
+_logo_uri = _logo_data_uri()
+logo_html = (
+    f'<img src="{_logo_uri}" alt="ESPRIT" />'
+    if _logo_uri
+    else 'espr<span class="accent">it</span> <span class="accent">▸</span>'
+)
+
 st.markdown(
     f"""
     <style>
@@ -51,9 +67,9 @@ st.markdown(
         display: flex; align-items: center; justify-content: space-between;
         border-bottom: 3px solid {ESPRIT_RED}; padding-bottom: 0.9rem; margin-bottom: 1.4rem;
     }}
+    .esprit-logo img {{ height: 54px; }}
     .esprit-logo {{ font-size: 1.9rem; font-weight: 800; color: #1a1a1a; letter-spacing: -0.5px; }}
     .esprit-logo .accent {{ color: {ESPRIT_RED}; }}
-    .esprit-tagline {{ font-size: 0.78rem; color: #777; font-style: italic; margin-top: -4px; }}
     .esprit-title {{ text-align: right; }}
     .esprit-title .main {{ color: {ESPRIT_RED}; font-weight: 700; font-size: 1.05rem; }}
     .esprit-title .sub {{ color: #666; font-size: 0.8rem; }}
@@ -74,10 +90,7 @@ st.markdown(
     </style>
 
     <div class="esprit-header">
-      <div>
-        <div class="esprit-logo">espr<span class="accent">it</span> <span class="accent">▸</span></div>
-        <div class="esprit-tagline">Se former autrement</div>
-      </div>
+      <div class="esprit-logo">{logo_html}</div>
       <div class="esprit-title">
         <div class="main">POC Vérification IA des dossiers d'admission</div>
         <div class="sub">Outil interne de test — Admission parallèle 2025/2026</div>
