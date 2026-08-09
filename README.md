@@ -1,7 +1,9 @@
 # ESPRIT Admission POC — Vérification automatique des dossiers de candidature
 
-Proof of Concept développé dans le cadre du stage de fin d'études (Sprint 1 & 2) :
-prétraitement OpenCV → OCR Tesseract → classification par règles → extraction structurée.
+Proof of Concept développé dans le cadre du stage de fin d'études :
+prétraitement OpenCV → OCR Tesseract → classification par règles → extraction structurée
+(Sprint 1 & 2), complété par une vérification de cohérence d'identité entre documents et
+une génération de questions d'entretien via LLM (début de Sprint 3).
 
 Le système **n'émet aucune décision d'admission** : il produit un rapport JSON destiné
 à assister les enseignants dans la vérification des dossiers (voir rapport de stage,
@@ -45,7 +47,21 @@ document et écrit le rapport agrégé dans `data/reports/`.
 pytest -v
 ```
 
-## Arborescence (Sprint 1 & 2)
+## Interface Streamlit
+
+```
+streamlit run app.py
+```
+
+Un emplacement de dépôt par type de document (CIN, acte de naissance, bac, licence,
+relevé de notes), avec vérification automatique de la cohérence d'identité entre les
+documents déposés et génération de questions d'entretien.
+
+Pour activer la génération de questions (Module 2, LLM), définir la variable
+d'environnement `OPENAI_API_KEY` ou la saisir directement dans l'interface (jamais
+enregistrée sur le disque).
+
+## Arborescence
 
 ```
 config/            Paramètres (langues OCR, chemin Tesseract, seuils)
@@ -53,11 +69,14 @@ preprocessing/      Prétraitement OpenCV (contraste, bruit, redimensionnement, 
 ocr/                Interface avec Tesseract
 classification/     Classification par règles (5 types de documents)
 extraction/         Extracteurs spécialisés + contrat JSON commun
+verification/       Vérification de cohérence d'identité entre documents (Sprint 3)
+interview/          Génération de questions d'entretien via LLM (Sprint 3, Module 2)
 models/             Structures de données (Document, ExtractionResult, CandidateFile)
 tests/              Tests unitaires + générateur de documents d'exemple
 data/samples/       Documents d'exemple (générés)
 data/reports/       Rapports JSON produits par le pipeline
+app.py              Interface Streamlit
 ```
 
-La vérification de cohérence, le score de complétude et la génération de questions
-d'entretien (LLM) relèvent du Sprint 3 et ne sont pas couverts ici.
+Le score de complétude global du dossier (années universitaires, niveau académique,
+détection de doublons) reste à implémenter (suite du Sprint 3).

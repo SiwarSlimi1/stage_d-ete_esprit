@@ -11,15 +11,18 @@ son propre emplacement de dépôt, à l'image d'un vrai dossier de candidature.
 """
 import base64
 import json
+import os
 import tempfile
 from pathlib import Path
 
 import streamlit as st
 
 from config.settings import SAMPLES_DIR
+from interview.question_generator import LLMNotConfiguredError, build_candidate_profile, generate_interview_questions
 from main import process_document
 from ocr.tesseract_engine import extract_text
 from preprocessing.image_utils import load_image, preprocess_pipeline
+from verification.identity_checker import check_identity_consistency
 
 st.set_page_config(page_title="POC Vérification IA — ESPRIT", page_icon="📄", layout="wide")
 
@@ -122,7 +125,11 @@ def _run_pipeline(file_bytes: bytes, suffix: str) -> dict:
 
 
 def _find_sample(prefix: str) -> Path | None:
-    candidates = sorted(SAMPLES_DIR.glob(f"{prefix}.*"))
+    """Cherche un document d'exemple pour ce préfixe. Les documents synthétiques
+    (.png) sont préférés aux vraies photos (.jpg) pour garder une identité
+    cohérente sur l'ensemble du dossier de démonstration ; les vraies photos
+    restent testables individuellement via "Téléverser mes documents"."""
+    candidates = sorted(SAMPLES_DIR.glob(f"{prefix}.*"), key=lambda p: (p.suffix.lower() != ".png", p.name))
     return candidates[0] if candidates else None
 
 
@@ -228,6 +235,33 @@ for slot in DOCUMENT_SLOTS:
         st.caption("Aucun document déposé pour ce champ.")
         st.markdown("<hr style='border-top:1px solid #ededed; margin: 0.6rem 0 1.2rem;'>", unsafe_allow_html=True)
 
+# ---------- Vérification de cohérence d'identité (rapport §2.2.4, §3.2.5) ----------
+st.divider()
+st.markdown("### Cohérence d'identité entre documents")
+
+identity_documents = [
+    {"label": item["slot"]["label"], "fields": item["result"]["fields"]} for item in filled_results
+]
+identity_result = check_identity_consistency(identity_documents)
+
+if identity_result["comparable_documents"] < 2:
+    st.caption("Pas encore assez de documents avec un nom/prénom exploitable pour comparer.")
+elif identity_result["consistent"]:
+    st.success(
+        f"✅ Identité cohérente sur les {identity_result['comparable_documents']} "
+        "documents comparés."
+    )
+else:
+    st.error("🚫 Incohérence d'identité détectée entre plusieurs documents du dossier :")
+    for issue in identity_result["issues"]:
+        st.markdown(f"- {issue}")
+    st.caption(
+        "Le système signale l'anomalie mais ne rejette jamais automatiquement un "
+        "dossier — la décision reste aux enseignants (rapport §1.5). La génération "
+        "des questions d'entretien est toutefois bloquée tant que l'incohérence "
+        "n'est pas résolue."
+    )
+
 # ---------- Aperçu du dossier ----------
 st.divider()
 st.markdown("### Aperçu du dossier")
@@ -240,13 +274,64 @@ nb_mismatch = sum(
     if r["result"]["document_type"] != r["slot"]["key"] and r["result"]["document_type"] != "inconnu"
 )
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 col1.metric("Documents fournis", f"{nb_fournis} / {nb_total}")
 col2.metric("Extractions complètes", f"{nb_success} / {nb_fournis}" if nb_fournis else "0 / 0")
 col3.metric("Documents mal catégorisés", nb_mismatch)
+col4.metric("Identité cohérente", "Oui" if identity_result["consistent"] else "Non")
 
 st.caption(
-    "Cet aperçu ne remplace pas le score de complétude officiel (vérification de "
-    "cohérence, années universitaires, niveau académique) qui relève du Sprint 3, "
-    "non encore implémenté."
+    "Cet aperçu ne remplace pas le score de complétude officiel (années "
+    "universitaires, niveau académique) qui relève de la suite du Sprint 3, non "
+    "encore implémentée."
 )
+
+# ---------- Questions d'entretien (Module 2, rapport §3.3) ----------
+st.divider()
+st.markdown("### Questions d'entretien (Module 2)")
+st.caption(
+    "Génère des questions adaptées au profil du candidat (spécialité, résultats, "
+    "matières les mieux évaluées) à l'aide d'un LLM externe. Ce module n'intervient "
+    "jamais dans la vérification documentaire ci-dessus (rapport §4.5)."
+)
+
+api_key_input = st.text_input(
+    "Clé API LLM (OpenAI)",
+    value=os.environ.get("OPENAI_API_KEY", ""),
+    type="password",
+    help="Jamais enregistrée sur le disque : utilisée uniquement pour cette session.",
+)
+nb_questions = st.number_input("Nombre de questions à générer", min_value=5, max_value=50, value=30, step=5)
+
+can_generate = bool(filled_results) and identity_result["consistent"]
+if not filled_results:
+    st.caption("Dépose au moins un document du dossier pour générer des questions.")
+elif not identity_result["consistent"]:
+    st.caption("Génération bloquée : résous l'incohérence d'identité ci-dessus avant de continuer.")
+
+if st.button("Générer les questions d'entretien", disabled=not can_generate):
+    documents_for_profile = [
+        {"document_type": item["result"]["document_type"], "fields": item["result"]["fields"]}
+        for item in filled_results
+    ]
+    profile = build_candidate_profile(documents_for_profile)
+
+    with st.expander("Profil candidat transmis au LLM"):
+        st.json(profile)
+
+    try:
+        with st.spinner("Génération des questions en cours…"):
+            questions = generate_interview_questions(
+                profile, nb_questions=int(nb_questions), api_key=api_key_input or None
+            )
+        for i, question in enumerate(questions, start=1):
+            st.markdown(f"**{i}.** {question}")
+    except LLMNotConfiguredError as exc:
+        st.warning(str(exc))
+    except ImportError:
+        st.warning(
+            "Le paquet `openai` n'est pas installé. Lancez `pip install openai` "
+            "dans l'environnement du projet."
+        )
+    except Exception as exc:  # noqa: BLE001 - affichage direct de l'erreur API pour le debug en démo
+        st.error(f"Échec de l'appel au LLM : {exc}")
