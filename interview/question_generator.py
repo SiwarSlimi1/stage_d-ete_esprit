@@ -108,16 +108,31 @@ def _build_user_prompt(profile: dict, nb_questions: int) -> str:
 
 
 # Fournisseurs LLM pris en charge : variable d'environnement attendue et modèle
-# par défaut (gemini = fournisseur avec un palier gratuit, sans carte bancaire,
-# recommandé pour tester ce module sans dépendre d'un compte OpenAI facturé).
-_PROVIDER_ENV_VAR = {"openai": "OPENAI_API_KEY", "gemini": "GEMINI_API_KEY"}
-_PROVIDER_DEFAULT_MODEL = {"openai": "gpt-4o-mini", "gemini": "gemini-2.0-flash"}
+# par défaut. Groq est recommandé en priorité : gratuit, sans carte bancaire,
+# et sans le problème de quota "limit: 0" par modèle observé sur certains
+# comptes Gemini (30 req/min, 14 400 req/jour au niveau du compte - largement
+# suffisant pour ce POC).
+_PROVIDER_ENV_VAR = {
+    "openai": "OPENAI_API_KEY",
+    "gemini": "GEMINI_API_KEY",
+    "groq": "GROQ_API_KEY",
+}
+_PROVIDER_DEFAULT_MODEL = {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-2.0-flash",
+    "groq": "llama-3.3-70b-versatile",
+}
 
 
-def _call_openai(system_prompt: str, user_prompt: str, api_key: str, model: str) -> str:
+def _call_openai(system_prompt: str, user_prompt: str, api_key: str, model: str, base_url: str | None = None) -> str:
+    import httpx
     from openai import OpenAI  # import local : dépendance optionnelle du POC
 
-    client = OpenAI(api_key=api_key)
+    # Le client openai (httpx) ignore le magasin de certificats truststore par
+    # défaut ; on le lui passe explicitement pour le même motif que _call_gemini
+    # (antivirus/proxy interceptant le HTTPS avec un certificat non reconnu par
+    # le magasin figé d'OpenSSL, cf. _ssl_context).
+    client = OpenAI(api_key=api_key, base_url=base_url, http_client=httpx.Client(verify=_ssl_context()))
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -128,6 +143,12 @@ def _call_openai(system_prompt: str, user_prompt: str, api_key: str, model: str)
         temperature=0.7,
     )
     return response.choices[0].message.content
+
+
+def _call_groq(system_prompt: str, user_prompt: str, api_key: str, model: str) -> str:
+    """Groq expose une API compatible OpenAI (mêmes formats de requête/réponse) :
+    on réutilise le client openai, pointé sur le serveur Groq via base_url."""
+    return _call_openai(system_prompt, user_prompt, api_key, model, base_url="https://api.groq.com/openai/v1")
 
 
 def _ssl_context():
@@ -191,7 +212,7 @@ def _resolve_provider_and_key(provider: str, api_key: str | None) -> tuple[str, 
     aucune clé n'est disponible - jamais de repli silencieux."""
     provider = provider.lower()
     if provider not in _PROVIDER_ENV_VAR:
-        raise ValueError(f"Fournisseur LLM inconnu : {provider!r} (attendu : openai, gemini)")
+        raise ValueError(f"Fournisseur LLM inconnu : {provider!r} (attendu : openai, gemini, groq)")
 
     env_var = _PROVIDER_ENV_VAR[provider]
     resolved_key = api_key or os.environ.get(env_var)
@@ -207,6 +228,8 @@ def _resolve_provider_and_key(provider: str, api_key: str | None) -> tuple[str, 
 def _call_llm(provider: str, system_prompt: str, user_prompt: str, api_key: str, model: str) -> str:
     if provider == "openai":
         return _call_openai(system_prompt, user_prompt, api_key, model)
+    if provider == "groq":
+        return _call_groq(system_prompt, user_prompt, api_key, model)
     return _call_gemini(system_prompt, user_prompt, api_key, model)
 
 

@@ -187,27 +187,39 @@ _GEMINI_MODEL_CHOICES = [
     "gemini-2.0-flash-lite",
 ]
 
+_GROQ_MODEL_CHOICES = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "gemma2-9b-it",
+]
+
+_PROVIDER_OPTIONS = {
+    "Groq (gratuit, sans carte)": ("groq", "GROQ_API_KEY", _GROQ_MODEL_CHOICES),
+    "Google Gemini (gratuit)": ("gemini", "GEMINI_API_KEY", _GEMINI_MODEL_CHOICES),
+    "OpenAI": ("openai", "OPENAI_API_KEY", None),
+}
+
 
 def llm_provider_selector(key_prefix: str) -> tuple[str, str | None, str | None]:
     """Sélecteur de fournisseur LLM + clé API + modèle, réutilisé par l'espace
     enseignant (questions d'entretien) et l'espace candidat (quiz). Retourne
     (provider, api_key, model).
 
-    Le choix du modèle est exposé car le quota gratuit "limit: 0" observé sur
-    certains comptes Gemini est spécifique à un modèle donné (souvent
-    gemini-2.0-flash), pas un vrai dépassement d'usage : changer de modèle
-    suffit en général à débloquer un quota réellement disponible."""
+    Groq est proposé en premier : gratuit, sans carte bancaire, et sans le
+    problème de quota "limit: 0" par modèle observé sur certains comptes
+    Gemini (dépendant du projet Google Cloud associé, pas réellement lié à
+    l'usage). Le choix du modèle reste exposé pour Gemini/Groq afin de
+    contourner ce type de restriction si elle survient malgré tout."""
     col_provider, col_key = st.columns([1, 2])
     with col_provider:
         provider_choice = st.selectbox(
             "Fournisseur LLM",
-            ["Google Gemini (gratuit)", "OpenAI"],
-            help="Gemini propose un palier gratuit sans carte bancaire via Google AI Studio "
-            "(aistudio.google.com/apikey) - recommandé pour tester ce module.",
+            list(_PROVIDER_OPTIONS.keys()),
+            help="Groq (Llama) et Gemini proposent un palier gratuit sans carte bancaire. "
+            "Groq est recommandé : pas de quota nul par modèle comme observé parfois sur Gemini.",
             key=f"{key_prefix}_provider",
         )
-    provider = "gemini" if provider_choice.startswith("Google") else "openai"
-    env_var = "GEMINI_API_KEY" if provider == "gemini" else "OPENAI_API_KEY"
+    provider, env_var, model_choices = _PROVIDER_OPTIONS[provider_choice]
 
     with col_key:
         api_key_input = st.text_input(
@@ -219,12 +231,12 @@ def llm_provider_selector(key_prefix: str) -> tuple[str, str | None, str | None]
         )
 
     model = None
-    if provider == "gemini":
+    if model_choices:
         model = st.selectbox(
-            "Modèle Gemini",
-            _GEMINI_MODEL_CHOICES,
-            help="Si tu obtiens une erreur 429 avec \"limit: 0\", c'est que ce compte n'a pas de "
-            "quota gratuit pour ce modèle précis (pas un vrai dépassement) - essaie-en un autre.",
+            "Modèle",
+            model_choices,
+            help="Si tu obtiens une erreur 429 avec \"limit: 0\", ce compte n'a pas de quota "
+            "gratuit pour ce modèle précis (pas un vrai dépassement) - essaie-en un autre.",
             key=f"{key_prefix}_model",
         )
 
