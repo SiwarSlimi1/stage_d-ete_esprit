@@ -100,14 +100,18 @@ if not profile:
 st.divider()
 st.markdown("### 3. Génère ton quiz de pré-entretien")
 
-provider, api_key_input = llm_provider_selector(key_prefix="candidate")
+provider, api_key_input, model_input = llm_provider_selector(key_prefix="candidate")
 nb_questions = st.number_input("Nombre de questions", min_value=5, max_value=30, value=10, step=5)
 
 if st.button("Générer mon quiz"):
     try:
         with st.spinner("Génération du quiz en cours…"):
             quiz = generate_quiz_questions(
-                profile, nb_questions=int(nb_questions), provider=provider, api_key=api_key_input
+                profile,
+                nb_questions=int(nb_questions),
+                provider=provider,
+                api_key=api_key_input,
+                model=model_input,
             )
         if not quiz:
             st.warning("Le LLM n'a renvoyé aucune question exploitable. Réessaie.")

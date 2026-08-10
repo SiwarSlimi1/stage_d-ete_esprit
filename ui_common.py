@@ -179,10 +179,24 @@ def render_document_card(slot: dict, path: Path, processed_image, raw_text: str,
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-def llm_provider_selector(key_prefix: str) -> tuple[str, str | None]:
-    """Sélecteur de fournisseur LLM + champ de clé API, réutilisé par l'espace
+_GEMINI_MODEL_CHOICES = [
+    "gemini-2.0-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-1.5-flash",
+    "gemini-2.0-flash-lite",
+]
+
+
+def llm_provider_selector(key_prefix: str) -> tuple[str, str | None, str | None]:
+    """Sélecteur de fournisseur LLM + clé API + modèle, réutilisé par l'espace
     enseignant (questions d'entretien) et l'espace candidat (quiz). Retourne
-    (provider, api_key)."""
+    (provider, api_key, model).
+
+    Le choix du modèle est exposé car le quota gratuit "limit: 0" observé sur
+    certains comptes Gemini est spécifique à un modèle donné (souvent
+    gemini-2.0-flash), pas un vrai dépassement d'usage : changer de modèle
+    suffit en général à débloquer un quota réellement disponible."""
     col_provider, col_key = st.columns([1, 2])
     with col_provider:
         provider_choice = st.selectbox(
@@ -203,4 +217,15 @@ def llm_provider_selector(key_prefix: str) -> tuple[str, str | None]:
             help="Jamais enregistrée sur le disque : utilisée uniquement pour cette session.",
             key=f"{key_prefix}_api_key",
         )
-    return provider, (api_key_input or None)
+
+    model = None
+    if provider == "gemini":
+        model = st.selectbox(
+            "Modèle Gemini",
+            _GEMINI_MODEL_CHOICES,
+            help="Si tu obtiens une erreur 429 avec \"limit: 0\", c'est que ce compte n'a pas de "
+            "quota gratuit pour ce modèle précis (pas un vrai dépassement) - essaie-en un autre.",
+            key=f"{key_prefix}_model",
+        )
+
+    return provider, (api_key_input or None), model

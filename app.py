@@ -186,7 +186,7 @@ st.caption(
     "jamais dans la vérification documentaire ci-dessus (rapport §4.5)."
 )
 
-provider, api_key_input = llm_provider_selector(key_prefix="teacher")
+provider, api_key_input, model_input = llm_provider_selector(key_prefix="teacher")
 nb_questions = st.number_input("Nombre de questions à générer", min_value=5, max_value=50, value=30, step=5)
 
 can_generate = bool(filled_results) and identity_result["consistent"]
@@ -202,7 +202,7 @@ if st.button("Générer les questions d'entretien", disabled=not can_generate):
     try:
         with st.spinner("Génération des questions en cours…"):
             questions = generate_interview_questions(
-                profile, nb_questions=int(nb_questions), provider=provider, api_key=api_key_input
+                profile, nb_questions=int(nb_questions), provider=provider, api_key=api_key_input, model=model_input
             )
         for i, question in enumerate(questions, start=1):
             st.markdown(f"**{i}.** {question}")
