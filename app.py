@@ -295,12 +295,24 @@ st.caption(
     "jamais dans la vérification documentaire ci-dessus (rapport §4.5)."
 )
 
-api_key_input = st.text_input(
-    "Clé API LLM (OpenAI)",
-    value=os.environ.get("OPENAI_API_KEY", ""),
-    type="password",
-    help="Jamais enregistrée sur le disque : utilisée uniquement pour cette session.",
-)
+col_provider, col_key = st.columns([1, 2])
+with col_provider:
+    provider_choice = st.selectbox(
+        "Fournisseur LLM",
+        ["Google Gemini (gratuit)", "OpenAI"],
+        help="Gemini propose un palier gratuit sans carte bancaire via Google AI Studio "
+        "(aistudio.google.com/apikey) - recommandé pour tester ce module.",
+    )
+provider = "gemini" if provider_choice.startswith("Google") else "openai"
+env_var = "GEMINI_API_KEY" if provider == "gemini" else "OPENAI_API_KEY"
+
+with col_key:
+    api_key_input = st.text_input(
+        f"Clé API ({provider_choice})",
+        value=os.environ.get(env_var, ""),
+        type="password",
+        help="Jamais enregistrée sur le disque : utilisée uniquement pour cette session.",
+    )
 nb_questions = st.number_input("Nombre de questions à générer", min_value=5, max_value=50, value=30, step=5)
 
 can_generate = bool(filled_results) and identity_result["consistent"]
@@ -322,7 +334,7 @@ if st.button("Générer les questions d'entretien", disabled=not can_generate):
     try:
         with st.spinner("Génération des questions en cours…"):
             questions = generate_interview_questions(
-                profile, nb_questions=int(nb_questions), api_key=api_key_input or None
+                profile, nb_questions=int(nb_questions), provider=provider, api_key=api_key_input or None
             )
         for i, question in enumerate(questions, start=1):
             st.markdown(f"**{i}.** {question}")
