@@ -9,3 +9,6 @@ data/reports/*.json
 # (jamais de vrais documents d'identite dans ce depot public)
 data/samples/*.jpg
 data/samples/*.jpeg
+
+# Profils candidats et resultats de quiz (donnees personnelles locales)
+data/quiz_results/
