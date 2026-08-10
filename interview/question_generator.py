@@ -130,6 +130,35 @@ def _call_openai(system_prompt: str, user_prompt: str, api_key: str, model: str)
     return response.choices[0].message.content
 
 
+def _ssl_context():
+    """Construit un contexte SSL fiable même sur un poste où un antivirus ou un
+    proxy d'entreprise (Kaspersky, ESET...) intercepte le trafic HTTPS avec son
+    propre certificat racine, parfois mal formé au sens strict d'OpenSSL 3.x
+    (CERTIFICATE_VERIFY_FAILED : "Basic Constraints of CA cert not marked
+    critical" ou "unable to get local issuer certificate"), alors que la
+    connexion est légitime.
+
+    `truststore` délègue la vérification au magasin de certificats natif de
+    l'OS (Windows/macOS), qui accepte déjà ce certificat d'interception -
+    exactement ce que fait un navigateur. C'est la solution recommandée pour ce
+    cas précis, préférée à un magasin figé comme celui de certifi."""
+    import ssl
+
+    try:
+        import truststore
+
+        return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    except ImportError:
+        pass
+
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
 def _call_gemini(system_prompt: str, user_prompt: str, api_key: str, model: str) -> str:
     """Appelle l'API REST Gemini (Google AI Studio) directement en HTTP, pour ne
     pas ajouter de dépendance SDK supplémentaire au projet."""
@@ -148,7 +177,7 @@ def _call_gemini(system_prompt: str, user_prompt: str, api_key: str, model: str)
         url, data=payload, headers={"Content-Type": "application/json"}, method="POST"
     )
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with urllib.request.urlopen(request, timeout=60, context=_ssl_context()) as response:
             body = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")

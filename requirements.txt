@@ -5,3 +5,5 @@ numpy==2.5.1
 pytest==9.1.1
 streamlit==1.60.0
 openai==2.53.0
+certifi
+truststore
