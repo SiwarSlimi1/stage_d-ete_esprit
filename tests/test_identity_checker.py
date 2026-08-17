@@ -49,3 +49,16 @@ def test_minor_ocr_noise_does_not_trigger_false_positive():
     ]
     result = check_identity_consistency(documents)
     assert result["consistent"] is True
+
+
+def test_nom_prenom_swap_is_flagged_even_with_identical_word_set():
+    # Mêmes mots que la référence, mais dans un ordre différent : invisible à
+    # une comparaison par ensemble (même jeu de tokens), doit être détecté par
+    # comparaison de séquence (cf. rapport, anomalie "identite_releve_inversee").
+    documents = [
+        {"label": "CIN", "fields": {"nom": "BEN AMOR", "prenom": "Aymen"}},
+        {"label": "Relevé de notes", "fields": {"etudiant": "Aymen BEN AMOR"}},
+    ]
+    result = check_identity_consistency(documents)
+    assert result["consistent"] is False
+    assert "invers" in result["issues"][0]

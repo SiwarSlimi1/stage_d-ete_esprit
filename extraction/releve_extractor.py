@@ -10,7 +10,7 @@ import re
 from extraction.base_extractor import BaseExtractor, extract_after_label
 from ocr.text_normalization import normalize
 
-_HEADER_LABELS = {"annee universitaire", "etudiant", "moyenne generale", "moyenne", "resultat"}
+_HEADER_LABELS = {"annee universitaire", "niveau", "etudiant", "moyenne generale", "moyenne", "resultat"}
 _NOTE_PATTERN = re.compile(r"^(\d{1,2}(?:[.,]\d{1,2})?)\s*(?:/20)?$")
 
 
@@ -39,6 +39,7 @@ class ReleveExtractor(BaseExtractor):
     def _extract_fields(self, text: str, lines: list[dict] | None = None, image=None) -> dict:
         return {
             "annee_universitaire": extract_after_label(text, ["annee universitaire"]),
+            "niveau": extract_after_label(text, ["niveau"]),
             "etudiant": extract_after_label(text, ["etudiant"]),
             "matieres": _extract_matieres(text),
             "moyenne": extract_after_label(text, ["moyenne generale", "moyenne"]),

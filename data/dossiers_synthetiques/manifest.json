@@ -1,0 +1,188 @@
+[
+  {
+    "id": "01_valide_trabelsi_youssef",
+    "scenario": "valide",
+    "description": "Dossier complet et cohérent (L1 à L3, informatique).",
+    "nom_complet": "TRABELSI YOUSSEF",
+    "filiere": "INFORMATIQUE",
+    "dossier": "data/dossiers_synthetiques/01_valide_trabelsi_youssef",
+    "documents": [
+      "cin.png",
+      "acte_naissance.png",
+      "bac.png",
+      "diplome_licence.png",
+      "releve_l1.png",
+      "releve_l2.png",
+      "releve_l3.png"
+    ]
+  },
+  {
+    "id": "02_valide_gharbi_amira",
+    "scenario": "valide",
+    "description": "Dossier complet et cohérent (L1 à L3, génie civil).",
+    "nom_complet": "GHARBI AMIRA",
+    "filiere": "GENIE CIVIL",
+    "dossier": "data/dossiers_synthetiques/02_valide_gharbi_amira",
+    "documents": [
+      "cin.png",
+      "acte_naissance.png",
+      "bac.png",
+      "diplome_licence.png",
+      "releve_l1.png",
+      "releve_l2.png",
+      "releve_l3.png"
+    ]
+  },
+  {
+    "id": "03_valide_saidane_mohamed",
+    "scenario": "valide",
+    "description": "Dossier complet et cohérent (L1 à L3, génie électrique).",
+    "nom_complet": "SAIDANE MOHAMED",
+    "filiere": "GENIE ELECTRIQUE",
+    "dossier": "data/dossiers_synthetiques/03_valide_saidane_mohamed",
+    "documents": [
+      "cin.png",
+      "acte_naissance.png",
+      "bac.png",
+      "diplome_licence.png",
+      "releve_l1.png",
+      "releve_l2.png",
+      "releve_l3.png"
+    ]
+  },
+  {
+    "id": "04_valide_mansouri_ines",
+    "scenario": "valide",
+    "description": "Dossier complet et cohérent, avec une année de M1 en plus (informatique de gestion).",
+    "nom_complet": "MANSOURI INES",
+    "filiere": "INFORMATIQUE DE GESTION",
+    "dossier": "data/dossiers_synthetiques/04_valide_mansouri_ines",
+    "documents": [
+      "cin.png",
+      "acte_naissance.png",
+      "bac.png",
+      "diplome_licence.png",
+      "releve_l1.png",
+      "releve_l2.png",
+      "releve_l3.png",
+      "releve_m1.png"
+    ]
+  },
+  {
+    "id": "05_valide_chaabane_karim",
+    "scenario": "valide",
+    "description": "Dossier complet et cohérent (L1 à L3, génie mécanique).",
+    "nom_complet": "CHAABANE KARIM",
+    "filiere": "GENIE MECANIQUE",
+    "dossier": "data/dossiers_synthetiques/05_valide_chaabane_karim",
+    "documents": [
+      "cin.png",
+      "acte_naissance.png",
+      "bac.png",
+      "diplome_licence.png",
+      "releve_l1.png",
+      "releve_l2.png",
+      "releve_l3.png"
+    ]
+  },
+  {
+    "id": "06_incoherence_identite_jendoubi_rania",
+    "scenario": "incoherence_identite",
+    "description": "L'acte de naissance porte le prénom RAYEN au lieu de RANIA : simule un document mal déposé (ou appartenant à une autre personne). Doit être signalé par verification/identity_checker.py.",
+    "nom_complet": "JENDOUBI RANIA",
+    "filiere": "INFORMATIQUE",
+    "dossier": "data/dossiers_synthetiques/06_incoherence_identite_jendoubi_rania",
+    "documents": [
+      "cin.png",
+      "acte_naissance.png",
+      "bac.png",
+      "diplome_licence.png",
+      "releve_l1.png",
+      "releve_l2.png",
+      "releve_l3.png"
+    ]
+  },
+  {
+    "id": "07_document_manquant_bouazizi_sami",
+    "scenario": "document_manquant",
+    "description": "L'acte de naissance n'est pas fourni du tout : dossier incomplet, utile pour tester un futur score de complétude (rapport §9).",
+    "nom_complet": "BOUAZIZI SAMI",
+    "filiere": "GENIE CIVIL",
+    "dossier": "data/dossiers_synthetiques/07_document_manquant_bouazizi_sami",
+    "documents": [
+      "cin.png",
+      "bac.png",
+      "diplome_licence.png",
+      "releve_l1.png",
+      "releve_l2.png",
+      "releve_l3.png"
+    ]
+  },
+  {
+    "id": "08_annees_incoherentes_werghi_nadia",
+    "scenario": "annees_incoherentes",
+    "description": "Le relevé de L2 (2022/2023) manque : la L3 suit directement la L1, un trou dans le parcours à détecter (rapport §9 : vérification des années universitaires, doublons/années manquantes).",
+    "nom_complet": "WERGHI NADIA",
+    "filiere": "GENIE ELECTRIQUE",
+    "dossier": "data/dossiers_synthetiques/08_annees_incoherentes_werghi_nadia",
+    "documents": [
+      "cin.png",
+      "acte_naissance.png",
+      "bac.png",
+      "diplome_licence.png",
+      "releve_l1.png",
+      "releve_l3.png"
+    ]
+  },
+  {
+    "id": "09_dates_incoherentes_fejjari_hedi",
+    "scenario": "dates_incoherentes",
+    "description": "La date de naissance diffère entre la CIN (22/09/2002) et l'acte de naissance (12/03/2003) : incohérence que identity_checker.py ne détecte pas aujourd'hui (il ne compare que nom/prénom, pas les dates) - utile pour discuter une évolution de la vérification de cohérence.",
+    "nom_complet": "FEJJARI HEDI",
+    "filiere": "INFORMATIQUE DE GESTION",
+    "dossier": "data/dossiers_synthetiques/09_dates_incoherentes_fejjari_hedi",
+    "documents": [
+      "cin.png",
+      "acte_naissance.png",
+      "bac.png",
+      "diplome_licence.png",
+      "releve_l1.png",
+      "releve_l2.png",
+      "releve_l3.png"
+    ]
+  },
+  {
+    "id": "10_echec_annee_ayari_emna",
+    "scenario": "echec_annee",
+    "description": "L2 ajournée (moyenne 8.40, résultat AJOURNE) : le parcours s'arrête là (pas de L3 fournie), utile pour tester un futur critère de niveau académique conforme (rapport §9).",
+    "nom_complet": "AYARI EMNA",
+    "filiere": "GENIE MECANIQUE",
+    "dossier": "data/dossiers_synthetiques/10_echec_annee_ayari_emna",
+    "documents": [
+      "cin.png",
+      "acte_naissance.png",
+      "bac.png",
+      "diplome_licence.png",
+      "releve_l1.png",
+      "releve_l2.png"
+    ]
+  },
+  {
+    "id": "11_document_duplique_sassi_yassine",
+    "scenario": "document_duplique",
+    "description": "Le relevé de L2 est déposé deux fois (releve_l2.png et releve_l2_bis.png, contenu identique) : simule un doublon d'upload, utile pour tester une future détection de documents dupliqués (rapport §9).",
+    "nom_complet": "SASSI YASSINE",
+    "filiere": "INFORMATIQUE",
+    "dossier": "data/dossiers_synthetiques/11_document_duplique_sassi_yassine",
+    "documents": [
+      "cin.png",
+      "acte_naissance.png",
+      "bac.png",
+      "diplome_licence.png",
+      "releve_l1.png",
+      "releve_l2.png",
+      "releve_l2_bis.png",
+      "releve_l3.png"
+    ]
+  }
+]

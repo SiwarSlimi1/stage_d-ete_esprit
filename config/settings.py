@@ -6,6 +6,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 SAMPLES_DIR = DATA_DIR / "samples"
 REPORTS_DIR = DATA_DIR / "reports"
+# Dossiers candidats fictifs (tests/generate_synthetic_dataset.py), utilisés par
+# l'espace enseignant pour démontrer le pipeline sans données réelles (rapport §10).
+SYNTHETIC_DATASET_DIR = DATA_DIR / "dossiers_synthetiques"
 
 # Langues Tesseract activées : français, arabe, anglais (cf. rapport §3.2.2)
 OCR_LANGUAGES = "fra+ara+eng"

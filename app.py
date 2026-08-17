@@ -21,12 +21,17 @@ from interview.question_generator import LLMNotConfiguredError, build_candidate_
 from interview.quiz_store import candidate_key, load as load_candidate_data, save_profile
 from ui_common import (
     DOCUMENT_SLOTS,
+    SCENARIO_ICONS,
+    demo_document_slots,
     find_sample,
     inject_esprit_theme,
     llm_provider_selector,
+    load_demo_dataset,
     render_document_card,
     run_pipeline,
 )
+from verification.academic_years_checker import check_academic_years
+from verification.duplicate_document_checker import check_duplicate_documents
 from verification.identity_checker import check_identity_consistency
 
 st.set_page_config(page_title="POC Vérification IA — ESPRIT", page_icon="📄", layout="wide")
@@ -40,21 +45,48 @@ st.info(
     "vérification destiné à assister les enseignants (rapport de stage, §1.5)."
 )
 
-mode = st.radio(
-    "Source des documents du dossier",
-    ["Téléverser mes documents", "Utiliser les documents d'exemple"],
-    horizontal=True,
-)
+MODE_UPLOAD = "Téléverser mes documents"
+MODE_SAMPLE = "Utiliser les documents d'exemple"
+MODE_DEMO = "Dossier de démonstration (jeu de données synthétique)"
+
+mode = st.radio("Source des documents du dossier", [MODE_UPLOAD, MODE_SAMPLE, MODE_DEMO], horizontal=True)
+
+demo_entry: dict | None = None
+active_slots = DOCUMENT_SLOTS
+
+if mode == MODE_DEMO:
+    demo_dataset = load_demo_dataset()
+    if not demo_dataset:
+        st.warning(
+            "Aucun dossier de démonstration trouvé. Génère-les d'abord avec "
+            "`python -m tests.generate_synthetic_dataset` (voir "
+            "`data/dossiers_synthetiques/README.md`)."
+        )
+    else:
+        demo_entry = st.selectbox(
+            "Dossier candidat (100% synthétique — aucune donnée réelle, rapport §10)",
+            demo_dataset,
+            format_func=lambda e: f"{SCENARIO_ICONS.get(e['scenario'], '•')} {e['nom_complet']} — {e['filiere'].title()}",
+        )
+        st.caption(demo_entry["description"])
+        active_slots = demo_document_slots(demo_entry)
 
 st.divider()
 
 filled_results: list[dict] = []
 
-for slot in DOCUMENT_SLOTS:
+for slot in active_slots:
     path: Path | None = None
     processed_image = raw_text = result = None
 
-    if mode == "Utiliser les documents d'exemple":
+    if mode == MODE_DEMO:
+        if demo_entry is not None and slot["path"] is not None:
+            with st.spinner(f"Traitement — {slot['label']}…"):
+                data = run_pipeline(slot["path"].read_bytes(), slot["path"].suffix)
+            path = slot["path"]
+            processed_image, raw_text = data["processed_image"], data["raw_text"]
+            result = {**data["result"], "source_image": str(path)}
+    elif mode == MODE_SAMPLE:
         sample_path = find_sample(slot["sample_prefix"])
         if sample_path is not None:
             with st.spinner(f"Traitement — {slot['label']}…"):
@@ -81,7 +113,7 @@ for slot in DOCUMENT_SLOTS:
 
     if result is not None:
         render_document_card(slot, path, processed_image, raw_text, result)
-        filled_results.append({"slot": slot, "result": result})
+        filled_results.append({"slot": slot, "result": result, "raw_text": raw_text})
     else:
         st.markdown(f"##### {slot['label']}")
         st.caption("Aucun document déposé pour ce champ.")
@@ -114,11 +146,46 @@ else:
         "n'est pas résolue."
     )
 
+# ---------- Cohérence des années universitaires (rapport §9) ----------
+st.divider()
+st.markdown("### Cohérence des années universitaires")
+
+releve_fields = [item["result"]["fields"] for item in filled_results if item["result"]["document_type"] == "releve_notes"]
+licence_fields = next(
+    (item["result"]["fields"] for item in filled_results if item["result"]["document_type"] == "diplome_licence"), None
+)
+academic_years_result = check_academic_years(releve_fields, licence_fields)
+
+if len(releve_fields) < 2:
+    st.caption("Pas encore assez de relevés pour vérifier la cohérence des années.")
+elif academic_years_result["consistent"]:
+    st.success(f"✅ Années universitaires cohérentes sur les {len(releve_fields)} relevés fournis.")
+else:
+    st.error("🚫 Incohérence détectée dans les années universitaires :")
+    for issue in academic_years_result["issues"]:
+        st.markdown(f"- {issue}")
+
+# ---------- Détection de documents dupliqués (rapport §9) ----------
+st.divider()
+st.markdown("### Documents dupliqués")
+
+raw_text_documents = [{"label": item["slot"]["label"], "raw_text": item["raw_text"]} for item in filled_results]
+duplicate_result = check_duplicate_documents(raw_text_documents)
+
+if len(raw_text_documents) < 2:
+    st.caption("Pas encore assez de documents pour détecter un doublon.")
+elif duplicate_result["consistent"]:
+    st.success("✅ Aucun document dupliqué détecté.")
+else:
+    st.error("🚫 Documents potentiellement dupliqués :")
+    for issue in duplicate_result["issues"]:
+        st.markdown(f"- {issue}")
+
 # ---------- Aperçu du dossier ----------
 st.divider()
 st.markdown("### Aperçu du dossier")
 
-nb_total = len(DOCUMENT_SLOTS)
+nb_total = len(active_slots)
 nb_fournis = len(filled_results)
 nb_success = sum(1 for r in filled_results if r["result"]["extraction_status"] == "success")
 nb_mismatch = sum(
@@ -126,16 +193,19 @@ nb_mismatch = sum(
     if r["result"]["document_type"] != r["slot"]["key"] and r["result"]["document_type"] != "inconnu"
 )
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5, col6 = st.columns(6)
 col1.metric("Documents fournis", f"{nb_fournis} / {nb_total}")
 col2.metric("Extractions complètes", f"{nb_success} / {nb_fournis}" if nb_fournis else "0 / 0")
 col3.metric("Documents mal catégorisés", nb_mismatch)
 col4.metric("Identité cohérente", "Oui" if identity_result["consistent"] else "Non")
+col5.metric("Années cohérentes", "Oui" if academic_years_result["consistent"] else "Non")
+col6.metric("Sans doublon", "Oui" if duplicate_result["consistent"] else "Non")
 
 st.caption(
-    "Cet aperçu ne remplace pas le score de complétude officiel (années "
-    "universitaires, niveau académique) qui relève de la suite du Sprint 3, non "
-    "encore implémentée."
+    "Cet aperçu ne remplace pas un score de complétude chiffré (pondération par "
+    "type d'anomalie, seuils de statut) : cela nécessite un barème que seule "
+    "l'encadrante peut fournir (rapport §10). Le niveau académique conforme "
+    "(moyennes minimales, mentions attendues) reste également à définir."
 )
 
 # ---------- Profil candidat : sauvegarde pour l'espace candidat ----------

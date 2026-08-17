@@ -32,6 +32,34 @@ python -m tests.sample_documents
 
 Cela crée 5 images dans `data/samples/` (cin, acte de naissance, bac, licence, relevé de notes).
 
+## Jeu de données synthétique diversifié (dossiers complets)
+
+Les vrais dossiers de candidats étant confidentiels (consigne de l'encadrante,
+rapport §10), un second générateur produit 11 dossiers candidats fictifs complets
+(CIN, acte de naissance, bac, licence, relevés L1/L2/L3/M1), dont 5 valides et 6
+avec une anomalie volontaire (identité incohérente, document manquant, années
+incohérentes, dates incohérentes, année ajournée, document dupliqué) :
+
+```
+python -m tests.generate_synthetic_dataset
+```
+
+Crée les dossiers et `manifest.json` dans `data/dossiers_synthetiques/` — voir le
+`README.md` de ce dossier pour le détail de chaque scénario.
+
+## Évaluation à grande échelle (1000 dossiers)
+
+`data/samples_dataset/` contient un jeu de 1000 dossiers synthétiques avec vérité
+terrain (`manifest.jsonl`), utilisé pour mesurer la fiabilité réelle du pipeline
+(précision de classification, exactitude champ par champ, taux de détection des
+6 types d'anomalies) plutôt que de se limiter aux 38 tests unitaires sur un seul
+candidat. Voir `data/samples_dataset/README.md`.
+
+```
+python -m tests.generate_dataset_images --from-manifest   # régénère les images (non versionnées)
+python -m tests.evaluate_pipeline --per-anomalie 15        # évalue le pipeline (~105 dossiers)
+```
+
 ## Exécution du pipeline
 
 ```

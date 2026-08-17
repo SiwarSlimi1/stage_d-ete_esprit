@@ -10,7 +10,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from config.settings import SAMPLES_DIR
+from config.settings import BASE_DIR, SAMPLES_DIR, SYNTHETIC_DATASET_DIR
 from main import process_document
 from ocr.tesseract_engine import extract_text
 from preprocessing.image_utils import load_image, preprocess_pipeline
@@ -122,6 +122,67 @@ def find_sample(prefix: str) -> Path | None:
     restent testables individuellement via "Téléverser mes documents"."""
     candidates = sorted(SAMPLES_DIR.glob(f"{prefix}.*"), key=lambda p: (p.suffix.lower() != ".png", p.name))
     return candidates[0] if candidates else None
+
+
+# ---------------------------------------------------------------------------
+# Dossiers de démonstration (tests/generate_synthetic_dataset.py) : jeu de
+# données 100% synthétique remplaçant les vrais dossiers, confidentiels
+# (rapport §10). Permet de faire la démonstration du pipeline sur des dossiers
+# complets - dont certains volontairement invalides - sans jamais manipuler de
+# donnée personnelle réelle.
+# ---------------------------------------------------------------------------
+SCENARIO_ICONS = {
+    "valide": "✅",
+    "incoherence_identite": "⚠️",
+    "document_manquant": "⚠️",
+    "annees_incoherentes": "⚠️",
+    "dates_incoherentes": "⚠️",
+    "echec_annee": "⚠️",
+    "document_duplique": "⚠️",
+}
+
+_FIXED_DEMO_SLOTS = [
+    {"key": "cin", "label": "Carte d'identité nationale (CIN)", "filename": "cin.png"},
+    {"key": "acte_naissance", "label": "Acte de naissance", "filename": "acte_naissance.png"},
+    {"key": "bac", "label": "Diplôme du baccalauréat", "filename": "bac.png"},
+    {"key": "diplome_licence", "label": "Diplôme de licence", "filename": "diplome_licence.png"},
+]
+
+
+@st.cache_data(show_spinner=False)
+def load_demo_dataset() -> list[dict]:
+    """Charge le manifeste des dossiers de démonstration, s'il a été généré
+    (`python -m tests.generate_synthetic_dataset`). Retourne [] sinon."""
+    manifest_path = SYNTHETIC_DATASET_DIR / "manifest.json"
+    if not manifest_path.exists():
+        return []
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+def _releve_label(filename: str) -> str:
+    # "releve_l2_bis.png" -> niveau "l2", 2e dépôt ; "releve_m1.png" -> niveau "m1"
+    stem = Path(filename).stem.removeprefix("releve_")
+    is_duplicate = stem.endswith("_bis")
+    niveau = stem.removesuffix("_bis").upper()
+    label = f"Relevé de notes — {niveau}"
+    return f"{label} (2e dépôt)" if is_duplicate else label
+
+
+def demo_document_slots(entry: dict) -> list[dict]:
+    """Construit les emplacements à afficher pour un dossier de démonstration :
+    les 4 documents administratifs (affichés comme "manquant" s'ils ne font pas
+    partie du dossier - cf. scénario "document_manquant"), suivis d'un emplacement
+    par relevé présent (L1, L2, L3, M1, éventuels doublons)."""
+    folder = BASE_DIR / entry["dossier"]
+    documents = set(entry["documents"])
+
+    slots = [
+        {"key": base["key"], "label": base["label"], "path": folder / base["filename"] if base["filename"] in documents else None}
+        for base in _FIXED_DEMO_SLOTS
+    ]
+    releve_files = sorted(f for f in entry["documents"] if f.startswith("releve_"))
+    slots += [{"key": "releve_notes", "label": _releve_label(f), "path": folder / f} for f in releve_files]
+    return slots
 
 
 def render_document_card(slot: dict, path: Path, processed_image, raw_text: str, result: dict) -> None:

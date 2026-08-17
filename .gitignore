@@ -12,3 +12,9 @@ data/samples/*.jpeg
 
 # Profils candidats et resultats de quiz (donnees personnelles locales)
 data/quiz_results/
+
+# Jeu d'evaluation a grande echelle (1000 dossiers, ~150 Mo d'images
+# synthetiques) : trop volumineux pour ce depot public, regenerable localement
+# via tests/generate_dataset_images.py. Le manifest (verite terrain, texte pur)
+# reste versionne.
+data/samples_dataset/*/*.png
