@@ -15,7 +15,13 @@ from pathlib import Path
 
 import streamlit as st
 
-from interview.question_generator import LLMNotConfiguredError, build_candidate_profile, generate_quiz_questions
+from interview.question_generator import (
+    LLMNotConfiguredError,
+    build_candidate_profile,
+    generate_interview_feedback,
+    generate_interview_questions,
+    generate_quiz_questions,
+)
 from interview.quiz_store import candidate_key, load as load_candidate_data, save_profile, save_quiz_result
 from ui_common import find_sample, inject_esprit_theme, llm_provider_selector, render_document_card, run_pipeline
 
@@ -163,3 +169,76 @@ if quiz:
                 f"Ta réponse : {q['options'][given] if given is not None else '(sans réponse)'} — "
                 f"Bonne réponse : {q['options'][correct]}"
             )
+
+st.divider()
+st.markdown("### 5. Entretien simulé (questions ouvertes)")
+st.info(
+    "Ce retour est un outil de préparation personnel : contrairement au score du quiz "
+    "ci-dessus, il n'est **jamais transmis à l'enseignant ni lié à ton dossier** - et il "
+    "ne constitue jamais un verdict d'admission ni une recommandation de spécialité "
+    "(rapport §1.5)."
+)
+
+nb_mock_questions = st.number_input(
+    "Nombre de questions", min_value=3, max_value=10, value=5, step=1, key="mock_nb_questions"
+)
+
+if st.button("Générer mes questions d'entretien simulé"):
+    try:
+        with st.spinner("Génération des questions en cours…"):
+            mock_questions = generate_interview_questions(
+                profile,
+                nb_questions=int(nb_mock_questions),
+                provider=provider,
+                api_key=api_key_input,
+                model=model_input,
+            )
+        if not mock_questions:
+            st.warning("Le LLM n'a renvoyé aucune question exploitable. Réessaie.")
+        else:
+            st.session_state["mock_questions"] = mock_questions
+            st.session_state["mock_feedback"] = None
+    except LLMNotConfiguredError as exc:
+        st.warning(str(exc))
+    except ImportError:
+        st.warning("Le paquet `openai` n'est pas installé. Lancez `pip install openai`.")
+    except Exception as exc:  # noqa: BLE001 - affichage direct de l'erreur API pour le debug en démo
+        st.error(f"Échec de l'appel au LLM : {exc}")
+
+mock_questions = st.session_state.get("mock_questions")
+
+if mock_questions:
+    st.markdown("#### Réponds librement à chaque question, comme dans un vrai entretien")
+    for i, question in enumerate(mock_questions):
+        st.text_area(f"**{i + 1}. {question}**", key=f"mock_answer_{i}", height=100)
+
+    if st.button("Obtenir mon retour de préparation"):
+        qa_pairs = [
+            {"question": q, "reponse": (st.session_state.get(f"mock_answer_{i}") or "").strip() or "(sans réponse)"}
+            for i, q in enumerate(mock_questions)
+        ]
+        try:
+            with st.spinner("Analyse de tes réponses en cours…"):
+                feedback = generate_interview_feedback(
+                    profile, qa_pairs, provider=provider, api_key=api_key_input, model=model_input
+                )
+            st.session_state["mock_feedback"] = feedback
+        except LLMNotConfiguredError as exc:
+            st.warning(str(exc))
+        except ImportError:
+            st.warning("Le paquet `openai` n'est pas installé. Lancez `pip install openai`.")
+        except Exception as exc:  # noqa: BLE001 - affichage direct de l'erreur API pour le debug en démo
+            st.error(f"Échec de l'appel au LLM : {exc}")
+
+    feedback = st.session_state.get("mock_feedback")
+    if feedback:
+        st.markdown("#### Ton retour de préparation")
+        for title, key in [
+            ("Points forts", "points_forts"),
+            ("Axes d'amélioration", "axes_amelioration"),
+            ("Conseils pour l'entretien réel", "conseils_preparation"),
+        ]:
+            if feedback.get(key):
+                st.markdown(f"**{title}**")
+                for item in feedback[key]:
+                    st.markdown(f"- {item}")

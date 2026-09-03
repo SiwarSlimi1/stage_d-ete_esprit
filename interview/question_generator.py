@@ -7,7 +7,11 @@ substituer à leur jugement (rapport §1.5, §3.3).
 
 Complète aussi, à la demande de l'encadrante, un quiz de pré-entretien (QCM)
 que le candidat peut passer lui-même pour s'entraîner avant l'entretien réel
-(generate_quiz_questions) - fonctionnalité hors périmètre initial du rapport.
+(generate_quiz_questions), ainsi qu'un entretien simulé à questions ouvertes
+avec retour formatif du LLM (generate_interview_feedback) - fonctionnalités
+hors périmètre initial du rapport, réservées à l'espace candidat et sans
+aucune incidence sur la vérification du dossier ni sur la décision
+d'admission (rapport §1.5).
 """
 import json
 import os
@@ -29,6 +33,31 @@ _QUIZ_SYSTEM_PROMPT = (
     "liées à sa spécialité et à son parcours académique. N'inclus jamais de "
     "question portant sur des critères personnels (origine, religion, "
     "situation familiale, apparence...)."
+)
+
+# Feedback sur un entretien simulé (questions ouvertes, generate_interview_questions
+# + réponses libres du candidat) : contrairement au quiz QCM (corrigé par
+# comparaison directe à correct_index, sans jugement), une réponse libre
+# nécessite une évaluation par le LLM. Cette évaluation reste strictement
+# formative (rapport §1.5) : la consigne "jamais de verdict d'admission" est
+# répétée deux fois (prompt système + rappel dans le prompt utilisateur) et
+# le schéma JSON attendu n'a volontairement aucun champ de type
+# admis/capable/score-global, pour qu'il n'y ait rien à remplir dans ce sens
+# même si le modèle y était enclin.
+_MOCK_INTERVIEW_FEEDBACK_SYSTEM_PROMPT = (
+    "Tu es un enseignant d'ESPRIT qui aide un candidat à se préparer à un "
+    "entretien d'admission parallèle, en lui donnant un retour constructif "
+    "sur un entretien d'entraînement qu'il vient de passer seul, en dehors de "
+    "toute procédure d'admission réelle. "
+    "Règle absolue, non négociable : tu ne donnes JAMAIS de verdict "
+    "d'admission ni de jugement sur sa capacité à obtenir sa spécialité "
+    "('tu seras/ne seras pas admis', 'tu es/n'es pas capable d'obtenir cette "
+    "spécialité', 'je recommande telle autre spécialité à ta place'). La "
+    "décision d'admission appartient exclusivement au jury d'enseignants et "
+    "ne repose jamais sur cet outil. Ton retour reste un conseil de "
+    "préparation : points forts observés dans les réponses, axes "
+    "d'amélioration concrets, et conseils pour l'entretien réel - jamais un "
+    "jugement sur l'admissibilité ou l'orientation du candidat."
 )
 
 
@@ -308,3 +337,53 @@ def generate_quiz_questions(
         and 0 <= q["correct_index"] <= 3
     ]
     return valid[:nb_questions]
+
+
+def _build_mock_interview_feedback_prompt(profile: dict, qa_pairs: list[dict]) -> str:
+    return (
+        "Voici le profil du candidat, extrait automatiquement de son dossier de "
+        f"candidature :\n{json.dumps(profile, ensure_ascii=False, indent=2)}\n\n"
+        "Voici les questions d'entretien qui lui ont été posées lors d'un "
+        f"entraînement en solo, et ses réponses :\n"
+        f"{json.dumps(qa_pairs, ensure_ascii=False, indent=2)}\n\n"
+        "Donne-lui un retour de préparation constructif sur ces réponses. "
+        "Rappel : ce retour ne doit contenir aucun verdict d'admission ni "
+        "jugement sur sa capacité à obtenir sa spécialité - uniquement des "
+        "conseils de préparation à l'entretien réel. "
+        'Réponds uniquement avec un objet JSON de la forme {"points_forts": '
+        '["...", ...], "axes_amelioration": ["...", ...], "conseils_preparation": '
+        '["...", ...]}, sans texte autour. Chaque liste contient 2 à 4 éléments '
+        "concrets et rédigés en français, faisant référence aux réponses "
+        "effectivement données quand c'est pertinent."
+    )
+
+
+def generate_interview_feedback(
+    profile: dict,
+    qa_pairs: list[dict],
+    provider: str = "gemini",
+    api_key: str | None = None,
+    model: str | None = None,
+) -> dict:
+    """Évalue les réponses d'un candidat à un entretien simulé (questions
+    ouvertes de generate_interview_questions, réponses libres) et retourne un
+    retour de préparation formatif - jamais un verdict d'admission (rapport
+    §1.5, cf. docstring de _MOCK_INTERVIEW_FEEDBACK_SYSTEM_PROMPT).
+
+    `qa_pairs` : liste de {"question": str, "reponse": str}.
+
+    Retourne {"points_forts": [str, ...], "axes_amelioration": [str, ...],
+    "conseils_preparation": [str, ...]}.
+    """
+    provider, api_key, default_model = _resolve_provider_and_key(provider, api_key)
+    user_prompt = _build_mock_interview_feedback_prompt(profile, qa_pairs)
+    raw_text = _call_llm(
+        provider, _MOCK_INTERVIEW_FEEDBACK_SYSTEM_PROMPT, user_prompt, api_key, model or default_model
+    )
+
+    payload = json.loads(raw_text)
+    return {
+        "points_forts": payload.get("points_forts", []),
+        "axes_amelioration": payload.get("axes_amelioration", []),
+        "conseils_preparation": payload.get("conseils_preparation", []),
+    }
