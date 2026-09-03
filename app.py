@@ -17,6 +17,11 @@ from pathlib import Path
 
 import streamlit as st
 
+from config.settings import (
+    COMPLETENESS_WEIGHT_COHERENCE,
+    COMPLETENESS_WEIGHT_EXTRACTION,
+    COMPLETENESS_WEIGHT_PRESENCE,
+)
 from interview.question_generator import LLMNotConfiguredError, build_candidate_profile, generate_interview_questions
 from interview.quiz_store import candidate_key, load as load_candidate_data, save_profile
 from ui_common import (
@@ -31,6 +36,7 @@ from ui_common import (
     run_pipeline,
 )
 from verification.academic_years_checker import check_academic_years
+from verification.completeness_score import compute_completeness
 from verification.duplicate_document_checker import check_duplicate_documents
 from verification.identity_checker import check_identity_consistency
 
@@ -193,6 +199,24 @@ nb_mismatch = sum(
     if r["result"]["document_type"] != r["slot"]["key"] and r["result"]["document_type"] != "inconnu"
 )
 
+completeness = compute_completeness(
+    active_slots, filled_results, identity_result, academic_years_result, duplicate_result
+)
+STATUS_DISPLAY = {
+    "complet": ("✅", "Dossier complet"),
+    "extraction_incomplete": ("🟡", "Extraction incomplète"),
+    "anomalie_detectee": ("🚫", "Anomalie détectée"),
+    "documents_manquants": ("⚠️", "Documents manquants"),
+}
+status_icon, status_label = STATUS_DISPLAY[completeness["status"]]
+
+col_score, col_status = st.columns([1, 3])
+col_score.metric("Score de complétude", f"{completeness['score']:.0%}")
+with col_status:
+    st.markdown(f"**Statut du dossier : {status_icon} {status_label}**")
+    if completeness["missing_documents"]:
+        st.caption("Documents manquants : " + ", ".join(completeness["missing_documents"]))
+
 col1, col2, col3, col4, col5, col6 = st.columns(6)
 col1.metric("Documents fournis", f"{nb_fournis} / {nb_total}")
 col2.metric("Extractions complètes", f"{nb_success} / {nb_fournis}" if nb_fournis else "0 / 0")
@@ -202,10 +226,14 @@ col5.metric("Années cohérentes", "Oui" if academic_years_result["consistent"] 
 col6.metric("Sans doublon", "Oui" if duplicate_result["consistent"] else "Non")
 
 st.caption(
-    "Cet aperçu ne remplace pas un score de complétude chiffré (pondération par "
-    "type d'anomalie, seuils de statut) : cela nécessite un barème que seule "
-    "l'encadrante peut fournir (rapport §10). Le niveau académique conforme "
-    "(moyennes minimales, mentions attendues) reste également à définir."
+    "Score indicatif combinant présence des documents "
+    f"({COMPLETENESS_WEIGHT_PRESENCE:.0%}), complétude de l'extraction "
+    f"({COMPLETENESS_WEIGHT_EXTRACTION:.0%}) et cohérence "
+    f"({COMPLETENESS_WEIGHT_COHERENCE:.0%}) - barème par défaut du POC, ajustable "
+    "dans config/settings.py, en l'absence de barème officiel de l'encadrante "
+    "(rapport §10). Ne remplace jamais la décision des enseignants (rapport §1.5) "
+    "et ne couvre pas le niveau académique (moyennes minimales, mentions "
+    "attendues), non défini à ce jour."
 )
 
 # ---------- Profil candidat : sauvegarde pour l'espace candidat ----------

@@ -97,7 +97,7 @@ preprocessing/      Prétraitement OpenCV (contraste, bruit, redimensionnement, 
 ocr/                Interface avec Tesseract
 classification/     Classification par règles (5 types de documents)
 extraction/         Extracteurs spécialisés + contrat JSON commun
-verification/       Vérification de cohérence d'identité entre documents (Sprint 3)
+verification/       Cohérence entre documents + score de complétude du dossier (Sprint 3)
 interview/          Génération de questions d'entretien via LLM (Sprint 3, Module 2)
 models/             Structures de données (Document, ExtractionResult, CandidateFile)
 tests/              Tests unitaires + générateur de documents d'exemple
@@ -106,5 +106,9 @@ data/reports/       Rapports JSON produits par le pipeline
 app.py              Interface Streamlit
 ```
 
-Le score de complétude global du dossier (années universitaires, niveau académique,
-détection de doublons) reste à implémenter (suite du Sprint 3).
+Le score de complétude global du dossier (présence des documents attendus, complétude
+de l'extraction, résultat des 3 vérifications de cohérence) est calculé par
+`verification/completeness_score.py`, avec un barème par défaut ajustable dans
+`config/settings.py` — aucun barème officiel n'ayant été fourni par l'encadrante à ce
+jour (rapport §10). Le niveau académique (moyennes minimales, mentions attendues) reste
+hors périmètre, faute de critère d'admission défini.

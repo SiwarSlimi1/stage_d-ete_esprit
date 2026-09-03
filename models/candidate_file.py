@@ -57,8 +57,11 @@ class ExtractionResult:
 class CandidateFile:
     """Dossier complet d'un candidat, agrégeant tous ses documents.
 
-    completeness_score et status sont calculés par le module de scoring (Sprint 3) ;
-    ils sont initialisés ici à une valeur neutre car non couverts par Sprint 1/2.
+    completeness_score et status reprennent la sortie de
+    verification.completeness_score.compute_completeness (Sprint 3) ; ils sont
+    initialisés ici à une valeur neutre, ce dataclass n'étant pas (encore)
+    instancié par le pipeline principal (app.py calcule ces valeurs directement
+    à partir de ses propres structures de dossier).
     """
 
     candidate_id: str

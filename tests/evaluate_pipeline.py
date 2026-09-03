@@ -19,7 +19,11 @@ mesure, par type de document et par type d'anomalie :
   - le taux de faux positifs de verification.duplicate_document_checker (le
     dataset ne contient pas de scénario "document dupliqué" au sens propre -
     utile ici pour vérifier qu'il ne se déclenche jamais par erreur entre des
-    relevés d'années différentes qui se ressemblent structurellement).
+    relevés d'années différentes qui se ressemblent structurellement) ;
+  - le score moyen de verification.completeness_score et son taux de
+    détection du statut "documents_manquants" (attendu haut uniquement sur
+    "document_bac_manquant" - le seul document réellement absent du dossier
+    dans ce dataset).
 
 Usage :
     python -m tests.evaluate_pipeline --per-anomalie 15   # ~105 dossiers (defaut)
@@ -39,8 +43,15 @@ from extraction import get_extractor
 from models.candidate_file import Document
 from ocr.text_normalization import normalize
 from verification.academic_years_checker import check_academic_years
+from verification.completeness_score import compute_completeness
 from verification.duplicate_document_checker import check_duplicate_documents
 from verification.identity_checker import check_identity_consistency
+
+# Documents administratifs attendus dans tout dossier, indépendamment de
+# l'anomalie simulée (utilisés comme "active_slots" pour le score de
+# complétude - cf. verification.completeness_score) ; les relevés attendus
+# varient par candidat et sont dérivés de ground_truth["releve_notes"].
+ADMIN_DOC_KEYS = ("cin", "acte_naissance", "bac", "diplome_licence")
 
 DATASET_DIR = DATA_DIR / "samples_dataset"
 _classifier = DocumentClassifier()
@@ -64,6 +75,7 @@ FIELD_MAP = {
 # zéro est attendu ("consistent" haut).
 IDENTITY_ANOMALIES = {"nom_mal_orthographie", "identite_releve_inversee"}
 ACADEMIC_YEARS_ANOMALIES = {"annee_universitaire_dupliquee", "annee_licence_incoherente"}
+DOCUMENT_PRESENCE_ANOMALIES = {"document_bac_manquant"}
 
 
 def process_document_with_text(path: Path) -> tuple[dict, str]:
@@ -163,6 +175,7 @@ def evaluate(entries: list[dict]) -> dict:
         "identity_consistent": 0, "identity_comparable": 0,
         "academic_years_consistent": 0,
         "duplicate_consistent": 0,
+        "completeness_score_sum": 0.0, "documents_manquants": 0,
     })
     details = []
 
@@ -175,6 +188,16 @@ def evaluate(entries: list[dict]) -> dict:
         identity_documents, raw_text_documents, releve_fields = [], [], []
         licence_fields = None
         dossier_detail = {"dossier_dir": entry["dossier_dir"], "anomalie": anomalie, "documents": {}}
+
+        # Slots attendus pour le score de complétude : les 4 documents
+        # administratifs (toujours attendus, quelle que soit l'anomalie
+        # simulée - absent du dossier si l'anomalie est "document_bac_manquant")
+        # + un slot par relevé réellement attendu pour ce candidat.
+        active_slots = {key: {"label": key} for key in ADMIN_DOC_KEYS}
+        active_slots.update(
+            {f"releve_{r['niveau']}": {"label": f"releve_{r['niveau']}"} for r in ground_truth.get("releve_notes", [])}
+        )
+        filled_results = []
 
         for doc_key, filename in entry["fichiers_generes"].items():
             path = dossier_dir / filename
@@ -197,6 +220,8 @@ def evaluate(entries: list[dict]) -> dict:
                 releve_fields.append(result["fields"])
             elif expected_type == "diplome_licence":
                 licence_fields = result["fields"]
+            if doc_key in active_slots:
+                filled_results.append({"slot": active_slots[doc_key], "result": result})
 
             dossier_detail["documents"][doc_key] = {
                 "document_type": result["document_type"],
@@ -219,10 +244,19 @@ def evaluate(entries: list[dict]) -> dict:
         if duplicate_result["consistent"]:
             by_anomalie[anomalie]["duplicate_consistent"] += 1
 
+        completeness_result = compute_completeness(
+            list(active_slots.values()), filled_results, identity_result, academic_years_result, duplicate_result
+        )
+        by_anomalie[anomalie]["completeness_score_sum"] += completeness_result["score"]
+        if completeness_result["status"] == "documents_manquants":
+            by_anomalie[anomalie]["documents_manquants"] += 1
+
         dossier_detail["identity_consistent"] = identity_result["consistent"]
         dossier_detail["academic_years_consistent"] = academic_years_result["consistent"]
         dossier_detail["academic_years_issues"] = academic_years_result["issues"]
         dossier_detail["duplicate_consistent"] = duplicate_result["consistent"]
+        dossier_detail["completeness_score"] = completeness_result["score"]
+        dossier_detail["completeness_status"] = completeness_result["status"]
         details.append(dossier_detail)
 
         if (i + 1) % 25 == 0:
@@ -243,19 +277,29 @@ def print_report(results: dict, nb_dossiers: int) -> None:
         )
 
     print(f"\n=== Cohérence par type d'anomalie ===")
-    print(f"{'anomalie':<38}{'dossiers':>9}{'identite':>10}{'annees':>9}{'doublons':>10}")
+    print(
+        f"{'anomalie':<38}{'dossiers':>9}{'identite':>10}{'annees':>9}{'doublons':>10}"
+        f"{'completude':>12}{'manquant':>10}"
+    )
     for anomalie, stats in sorted(results["by_anomalie"].items()):
         comparable = stats["identity_comparable"]
         identity_pct = 100 * stats["identity_consistent"] / comparable if comparable else float("nan")
         academic_pct = 100 * stats["academic_years_consistent"] / stats["nb_dossiers"]
         duplicate_pct = 100 * stats["duplicate_consistent"] / stats["nb_dossiers"]
-        print(f"{anomalie:<38}{stats['nb_dossiers']:>9}{identity_pct:>9.1f}%{academic_pct:>8.1f}%{duplicate_pct:>9.1f}%")
+        completeness_avg = stats["completeness_score_sum"] / stats["nb_dossiers"]
+        missing_pct = 100 * stats["documents_manquants"] / stats["nb_dossiers"]
+        print(
+            f"{anomalie:<38}{stats['nb_dossiers']:>9}{identity_pct:>9.1f}%{academic_pct:>8.1f}%"
+            f"{duplicate_pct:>9.1f}%{completeness_avg:>11.0%}{missing_pct:>9.1f}%"
+        )
 
     print(
-        "\n(colonnes = % de dossiers jugés 'coherent' par chaque module ; bas attendu sur "
-        f"{sorted(IDENTITY_ANOMALIES)} pour 'identite', sur {sorted(ACADEMIC_YEARS_ANOMALIES)} pour 'annees' ; "
-        "~100% attendu partout ailleurs, et sur 'doublons' pour toutes les categories - "
-        "ce dataset ne contient pas de scenario document-duplique au sens propre)"
+        "\n(colonnes = % de dossiers jugés 'coherent' par chaque module (score moyen pour "
+        "'completude') ; bas attendu sur "
+        f"{sorted(IDENTITY_ANOMALIES)} pour 'identite', sur {sorted(ACADEMIC_YEARS_ANOMALIES)} pour 'annees', "
+        f"sur {sorted(DOCUMENT_PRESENCE_ANOMALIES)} pour 'manquant' (% de dossiers au statut "
+        "'documents_manquants') ; ~100% attendu partout ailleurs, et sur 'doublons' pour toutes les "
+        "categories - ce dataset ne contient pas de scenario document-duplique au sens propre)"
     )
 
 

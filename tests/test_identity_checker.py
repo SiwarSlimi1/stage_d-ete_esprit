@@ -62,3 +62,39 @@ def test_nom_prenom_swap_is_flagged_even_with_identical_word_set():
     result = check_identity_consistency(documents)
     assert result["consistent"] is False
     assert "invers" in result["issues"][0]
+
+
+def test_different_birth_date_between_cin_and_acte_naissance_is_flagged():
+    documents = [
+        {"label": "CIN", "fields": {"nom": "FEJJARI", "prenom": "HEDI", "date_naissance": "22/09/2002"}},
+        {
+            "label": "Acte de naissance",
+            "fields": {"nom": "FEJJARI", "prenom": "HEDI", "date_naissance": "12/03/2003"},
+        },
+    ]
+    result = check_identity_consistency(documents)
+    assert result["consistent"] is False
+    assert "Date de naissance incohérente" in result["issues"][0]
+    assert "CIN" in result["issues"][0]
+    assert "Acte de naissance" in result["issues"][0]
+
+
+def test_same_birth_date_with_different_separator_is_not_flagged():
+    documents = [
+        {"label": "CIN", "fields": {"nom": "BEN ALI", "prenom": "SALMA", "date_naissance": "22/09/2002"}},
+        {
+            "label": "Acte de naissance",
+            "fields": {"nom": "BEN ALI", "prenom": "SALMA", "date_naissance": "22-09-2002"},
+        },
+    ]
+    result = check_identity_consistency(documents)
+    assert result["consistent"] is True
+
+
+def test_document_without_birth_date_does_not_affect_date_check():
+    documents = [
+        {"label": "CIN", "fields": {"nom": "BEN ALI", "prenom": "SALMA", "date_naissance": "22/09/2002"}},
+        {"label": "Relevé de notes", "fields": {"etudiant": "BEN ALI SALMA"}},
+    ]
+    result = check_identity_consistency(documents)
+    assert result["consistent"] is True

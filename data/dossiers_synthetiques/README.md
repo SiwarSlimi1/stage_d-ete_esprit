@@ -26,9 +26,9 @@ de gestion, génie mécanique) pour diversifier les relevés.
 | Dossier | Anomalie | Détecté aujourd'hui par... |
 |---|---|---|
 | `06_incoherence_identite_jendoubi_rania` | Prénom différent sur l'acte de naissance (RAYEN au lieu de RANIA) | ✅ `verification/identity_checker.py` |
-| `07_document_manquant_bouazizi_sami` | Acte de naissance absent du dossier | ❌ pas encore (score de complétude chiffré, barème à définir par l'encadrante) |
+| `07_document_manquant_bouazizi_sami` | Acte de naissance absent du dossier | ✅ `verification/completeness_score.py` (statut "documents_manquants") |
 | `08_annees_incoherentes_werghi_nadia` | Relevé de L2 manquant (la L3 suit directement la L1) | ✅ `verification/academic_years_checker.py` |
-| `09_dates_incoherentes_fejjari_hedi` | Date de naissance différente entre CIN et acte de naissance | ❌ pas encore (`identity_checker` ne compare que nom/prénom, pas les dates) |
+| `09_dates_incoherentes_fejjari_hedi` | Date de naissance différente entre CIN et acte de naissance | ✅ `verification/identity_checker.py` (comparaison de date, en plus du nom) |
 | `10_echec_annee_ayari_emna` | L2 ajournée (moyenne 8.40) puis parcours interrompu | ❌ pas encore (critère de niveau académique conforme non défini) |
 | `11_document_duplique_sassi_yassine` | Relevé de L2 déposé deux fois (`releve_l2.png` et `releve_l2_bis.png`, contenu identique) | ✅ `verification/duplicate_document_checker.py` |
 
@@ -39,8 +39,10 @@ l'emploi pour la fonctionnalité correspondante, une fois implémentée.
 ## Vérification
 
 Les 76 documents ont été passés dans le pipeline réel (prétraitement → OCR →
-classification → extraction) : 76/76 en `extraction_status: "success"`, et seul le
-dossier `06_incoherence_identite...` déclenche une alerte d'identité, comme prévu.
+classification → extraction) : 76/76 en `extraction_status: "success"`, et seuls
+les dossiers `06_incoherence_identite...` (nom) et `09_dates_incoherentes...`
+(date de naissance) déclenchent une alerte `identity_checker`, comme prévu -
+aucun faux positif sur les 5 dossiers valides.
 
 ## Régénérer le jeu de données
 

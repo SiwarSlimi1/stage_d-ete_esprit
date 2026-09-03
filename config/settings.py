@@ -27,5 +27,14 @@ DENOISE_KERNEL_SIZE = 3
 # Classification par règles
 MIN_CLASSIFICATION_CONFIDENCE = 0.15  # sous ce seuil -> document_type = "inconnu"
 
+# Score de complétude du dossier (verification/completeness_score.py) : barème
+# par défaut du POC, pondérant présence des documents, complétude de
+# l'extraction, et résultat des vérifications de cohérence - somme = 1.0.
+# Aucun barème officiel n'a été fourni par l'encadrante à ce jour (rapport
+# §10) ; ces valeurs sont ajustables sans changer le code.
+COMPLETENESS_WEIGHT_PRESENCE = 0.5
+COMPLETENESS_WEIGHT_EXTRACTION = 0.3
+COMPLETENESS_WEIGHT_COHERENCE = 0.2
+
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 SAMPLES_DIR.mkdir(parents=True, exist_ok=True)

@@ -34,15 +34,18 @@ python -m tests.evaluate_pipeline --full                # les 1000 dossiers, plu
 ```
 
 Fait tourner le pipeline réel (prétraitement → OCR → classification → extraction
-→ `verification.identity_checker`) sur chaque document et compare aux champs
-`ground_truth` du manifeste. Mesure, par type de document, la précision de
-classification, le statut d'extraction et l'exactitude champ par champ ; par
-type d'anomalie, si `identity_checker` la détecte (attendu seulement sur
-`nom_mal_orthographie` et `identite_releve_inversee` : c'est le seul module
-existant à ce jour qui compare une forme d'identité entre documents — les 4
-autres catégories ne sont pas des anomalies d'identité et ne sont détectées par
-aucun module pour l'instant, cf. rapport §9). Écrit un rapport JSON détaillé
-dans `data/reports/`.
+→ `identity_checker` / `academic_years_checker` / `duplicate_document_checker` /
+`completeness_score`) sur chaque document et compare aux champs `ground_truth`
+du manifeste. Mesure, par type de document, la précision de classification, le
+statut d'extraction et l'exactitude champ par champ ; par type d'anomalie, si
+chaque module la détecte — attendu seulement sur `nom_mal_orthographie` et
+`identite_releve_inversee` pour `identity_checker`, sur
+`annee_universitaire_dupliquee` et `annee_licence_incoherente` pour
+`academic_years_checker`, et sur `document_bac_manquant` pour
+`completeness_score` (statut "documents_manquants") ; ~100% attendu partout
+ailleurs. `moyenne_incoherente_avec_mention` n'est détectée par aucun module
+pour l'instant (cf. rapport §9). Écrit un rapport JSON détaillé dans
+`data/reports/`.
 
 ## Note sur la génération
 
