@@ -77,18 +77,22 @@ def compute_completeness(
     checks = (identity_result["consistent"], academic_years_result["consistent"], duplicate_result["consistent"])
     coherence_score = sum(checks) / len(checks)
 
-    if nb_total and not filled_results:
-        # Dossier entièrement vide : les scores d'extraction/cohérence sont
-        # vides de sens (rien à extraire, rien à comparer) et ne doivent pas
-        # produire un score plancher trompeur - le dossier est à 0%, pas
-        # partiellement "complet" avant même le premier dépôt.
-        score = 0.0
-    else:
-        score = (
-            COMPLETENESS_WEIGHT_PRESENCE * presence_score
-            + COMPLETENESS_WEIGHT_EXTRACTION * extraction_score
-            + COMPLETENESS_WEIGHT_COHERENCE * coherence_score
-        )
+    if presence_score == 0.0:
+        # Dossier entièrement vide (documents attendus mais aucun fourni) :
+        # extraction et cohérence n'ont rien à évaluer et ne doivent pas
+        # produire de score plancher trompeur, contrairement au cas où aucun
+        # document n'est attendu (nb_total == 0), où presence_score vaut 1.0
+        # et non 0.0 - ces deux scores restent donc cohérents avec le score
+        # global plutôt que d'être laissés à leur valeur par défaut (1.0) alors
+        # que celui-ci affiche 0%.
+        extraction_score = 0.0
+        coherence_score = 0.0
+
+    score = (
+        COMPLETENESS_WEIGHT_PRESENCE * presence_score
+        + COMPLETENESS_WEIGHT_EXTRACTION * extraction_score
+        + COMPLETENESS_WEIGHT_COHERENCE * coherence_score
+    )
 
     # Ordre de priorité du statut : un document manquant prime sur une
     # anomalie de cohérence, elle-même plus parlante qu'une extraction

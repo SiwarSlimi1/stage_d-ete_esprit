@@ -4,6 +4,7 @@ import pytest
 from interview.question_generator import (
     LLMNotConfiguredError,
     _build_mock_interview_feedback_prompt,
+    _strip_admission_verdicts,
     build_candidate_profile,
     generate_interview_feedback,
     generate_interview_questions,
@@ -65,3 +66,29 @@ def test_mock_interview_feedback_prompt_forbids_admission_verdict():
     assert "points_forts" in prompt
     assert "axes_amelioration" in prompt
     assert "conseils_preparation" in prompt
+
+
+def test_strip_admission_verdicts_keeps_legitimate_feedback():
+    items = ["Bonne maîtrise des bases de données.", "Approfondir les réseaux avant l'entretien."]
+    assert _strip_admission_verdicts(items) == items
+
+
+def test_strip_admission_verdicts_filters_verdict_shaped_sentences():
+    # Filet de sécurité applicatif (rapport §1.5) : même si le LLM ignore le
+    # prompt système, une phrase qui ressemble à un verdict d'admission ou une
+    # recommandation de spécialité ne doit jamais atteindre l'affichage.
+    items = [
+        "Bonne maîtrise des bases de données.",
+        "Tu n'es pas capable d'obtenir cette spécialité.",
+        "Je te recommande plutôt la spécialité Génie Civil.",
+    ]
+    assert _strip_admission_verdicts(items) == ["Bonne maîtrise des bases de données."]
+
+
+def test_strip_admission_verdicts_tolerates_malformed_llm_output():
+    # Le LLM ne respecte pas toujours le schéma JSON demandé (payload pas un
+    # dict, champ pas une liste, éléments non textuels) - ne doit jamais faire
+    # planter l'interface candidat.
+    assert _strip_admission_verdicts("pas une liste") == []
+    assert _strip_admission_verdicts(None) == []
+    assert _strip_admission_verdicts([123, None, "", "  ", "Bon point."]) == ["Bon point."]

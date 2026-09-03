@@ -16,9 +16,14 @@ enseignants. Sur le nom, deux formes de divergence sont distinguées :
     comparaison par ensemble seule ne détectait que 13% de ces inversions.
 
 Sur la date de naissance (champ exposé par la CIN et l'acte de naissance), la
-comparaison est un simple test d'égalité après normalisation du séparateur
+comparaison porte sur le couple (jour, année) plutôt que sur la date complète
 ("22/09/2002" == "22-09-2002") : contrairement au nom, il n'existe pas de
-variante légitime d'une date - toute divergence est un signal fort (cf.
+variante légitime d'une date, mais le mois n'est volontairement pas comparé
+- le repli positionnel de cin_extractor.py sur une CIN en écriture arabe
+(extraction.cin_extractor._find_date_like_fragment) peut renvoyer un mois en
+toutes lettres arabes plutôt qu'un nombre (ex. "12 اوت 2003"), qu'une
+comparaison chiffre à chiffre confondrait à tort avec une vraie incohérence.
+Toute divergence de jour ou d'année reste un signal fort (cf.
 data/dossiers_synthetiques/README.md, scénario "dates_incoherentes").
 
 Limite connue : la comparaison de noms est fondée sur la similarité textuelle
@@ -62,11 +67,18 @@ def _display_name(fields: dict) -> str:
     return fields.get("etudiant", "?")
 
 
-def _normalized_date(date_naissance: str) -> str:
-    """Ne garde que les chiffres d'une date, pour comparer "22/09/2002" et
-    "22-09-2002" comme identiques (variation de séparateur, pas une vraie
-    divergence)."""
-    return re.sub(r"\D", "", date_naissance)
+_DAY_YEAR_PATTERN = re.compile(r"(\d{1,2}).*?((?:19|20)\d{2})", re.DOTALL)
+
+
+def _day_and_year(date_naissance: str) -> tuple[str, str] | None:
+    """Extrait (jour, année) d'une date, tolérant un mois absent ou non
+    numérique (ex. "12 اوت 2003", repli arabe de cin_extractor.py) : comparer
+    le texte brut chiffre à chiffre confondrait un mois écrit différemment
+    avec une vraie divergence de date."""
+    match = _DAY_YEAR_PATTERN.search(date_naissance)
+    if not match:
+        return None
+    return match.group(1).lstrip("0") or "0", match.group(2)
 
 
 def check_identity_consistency(documents: list[dict]) -> dict:
@@ -111,16 +123,18 @@ def check_identity_consistency(documents: list[dict]) -> dict:
             )
 
     # Date de naissance : comparée séparément du nom, sur les seuls documents
-    # qui l'exposent (CIN, acte de naissance) - une divergence n'a, contrairement
-    # au nom, aucune variante légitime (cf. docstring du module).
+    # dont la date exposée est exploitable (jour + année identifiables) - une
+    # divergence n'a, contrairement au nom, aucune variante légitime (cf.
+    # docstring du module). Un fragment illisible (ni jour ni année) est
+    # ignoré plutôt que de fausser la comparaison.
     dated = [
-        {"label": doc["label"], "date_naissance": doc["fields"]["date_naissance"]}
+        {"label": doc["label"], "date_naissance": doc["fields"]["date_naissance"], "day_year": day_year}
         for doc in documents
-        if doc["fields"].get("date_naissance")
+        if doc["fields"].get("date_naissance") and (day_year := _day_and_year(doc["fields"]["date_naissance"]))
     ]
     date_reference = dated[0] if dated else None
     for other in dated[1:]:
-        if _normalized_date(date_reference["date_naissance"]) != _normalized_date(other["date_naissance"]):
+        if date_reference["day_year"] != other["day_year"]:
             issues.append(
                 f"Date de naissance incohérente entre « {date_reference['label']} » "
                 f"({date_reference['date_naissance']}) et « {other['label']} » "

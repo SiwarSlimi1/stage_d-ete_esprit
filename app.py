@@ -25,6 +25,7 @@ from config.settings import (
 from interview.question_generator import LLMNotConfiguredError, build_candidate_profile, generate_interview_questions
 from interview.quiz_store import candidate_key, load as load_candidate_data, save_profile
 from ui_common import (
+    COMPLETENESS_STATUS_LABELS,
     DOCUMENT_SLOTS,
     SCENARIO_ICONS,
     demo_document_slots,
@@ -134,14 +135,12 @@ identity_documents = [
 ]
 identity_result = check_identity_consistency(identity_documents)
 
-if identity_result["comparable_documents"] < 2:
-    st.caption("Pas encore assez de documents avec un nom/prénom exploitable pour comparer.")
-elif identity_result["consistent"]:
-    st.success(
-        f"✅ Identité cohérente sur les {identity_result['comparable_documents']} "
-        "documents comparés."
-    )
-else:
+if identity_result["issues"]:
+    # Priorité aux incohérences réellement détectées : la date de naissance
+    # est comparée indépendamment du nom (verification/identity_checker.py)
+    # et peut donc signaler une anomalie même quand moins de 2 documents
+    # exposent un nom/prénom exploitable (comparable_documents < 2) - il ne
+    # faut jamais masquer une incohérence détectée derrière ce message.
     st.error("🚫 Incohérence d'identité détectée entre plusieurs documents du dossier :")
     for issue in identity_result["issues"]:
         st.markdown(f"- {issue}")
@@ -150,6 +149,13 @@ else:
         "dossier — la décision reste aux enseignants (rapport §1.5). La génération "
         "des questions d'entretien est toutefois bloquée tant que l'incohérence "
         "n'est pas résolue."
+    )
+elif identity_result["comparable_documents"] < 2:
+    st.caption("Pas encore assez de documents avec un nom/prénom exploitable pour comparer.")
+else:
+    st.success(
+        f"✅ Identité cohérente sur les {identity_result['comparable_documents']} "
+        "documents comparés."
     )
 
 # ---------- Cohérence des années universitaires (rapport §9) ----------
@@ -202,18 +208,12 @@ nb_mismatch = sum(
 completeness = compute_completeness(
     active_slots, filled_results, identity_result, academic_years_result, duplicate_result
 )
-STATUS_DISPLAY = {
-    "complet": ("✅", "Dossier complet"),
-    "extraction_incomplete": ("🟡", "Extraction incomplète"),
-    "anomalie_detectee": ("🚫", "Anomalie détectée"),
-    "documents_manquants": ("⚠️", "Documents manquants"),
-}
-status_icon, status_label = STATUS_DISPLAY[completeness["status"]]
+status_icon, status_label, status_css = COMPLETENESS_STATUS_LABELS[completeness["status"]]
 
 col_score, col_status = st.columns([1, 3])
 col_score.metric("Score de complétude", f"{completeness['score']:.0%}")
 with col_status:
-    st.markdown(f"**Statut du dossier : {status_icon} {status_label}**")
+    st.markdown(f'Statut du dossier : <span class="{status_css}">{status_icon} {status_label}</span>', unsafe_allow_html=True)
     if completeness["missing_documents"]:
         st.caption("Documents manquants : " + ", ".join(completeness["missing_documents"]))
 

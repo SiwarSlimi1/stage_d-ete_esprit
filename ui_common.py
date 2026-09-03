@@ -24,6 +24,17 @@ STATUS_LABELS = {
     "failed": ("🔴", "Incomplet", "status-bad"),
 }
 
+# Statuts du score de complétude (verification/completeness_score.py) - même
+# forme (icône, libellé, classe CSS) que STATUS_LABELS ci-dessus, pour garder
+# un seul registre de style par statut plutôt que d'en dupliquer un second
+# dans app.py.
+COMPLETENESS_STATUS_LABELS = {
+    "complet": ("✅", "Dossier complet", "status-ok"),
+    "extraction_incomplete": ("🟡", "Extraction incomplète", "status-warn"),
+    "anomalie_detectee": ("🚫", "Anomalie détectée", "status-bad"),
+    "documents_manquants": ("⚠️", "Documents manquants", "status-warn"),
+}
+
 DOCUMENT_SLOTS = [
     {"key": "cin", "label": "Carte d'identité nationale (CIN)", "sample_prefix": "cin"},
     {"key": "acte_naissance", "label": "Acte de naissance", "sample_prefix": "acte_naissance"},

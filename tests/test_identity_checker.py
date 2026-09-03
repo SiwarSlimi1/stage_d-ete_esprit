@@ -98,3 +98,44 @@ def test_document_without_birth_date_does_not_affect_date_check():
     ]
     result = check_identity_consistency(documents)
     assert result["consistent"] is True
+
+
+def test_arabic_month_fallback_fragment_is_not_falsely_flagged_against_clean_date():
+    # Repli positionnel de cin_extractor.py sur une CIN en écriture arabe
+    # (_find_date_like_fragment) : le mois est conservé tel quel en arabe, pas
+    # reconstruit en chiffres - une comparaison chiffre à chiffre du texte brut
+    # confondrait ce fragment avec une vraie divergence de date.
+    documents = [
+        {"label": "CIN", "fields": {"nom": "BEN ALI", "prenom": "SALMA", "date_naissance": "12 اوت 2003"}},
+        {
+            "label": "Acte de naissance",
+            "fields": {"nom": "BEN ALI", "prenom": "SALMA", "date_naissance": "12/08/2003"},
+        },
+    ]
+    result = check_identity_consistency(documents)
+    assert result["consistent"] is True
+
+
+def test_arabic_month_fallback_fragment_still_flags_a_real_day_or_year_mismatch():
+    documents = [
+        {"label": "CIN", "fields": {"nom": "FEJJARI", "prenom": "HEDI", "date_naissance": "22 اوت 2002"}},
+        {
+            "label": "Acte de naissance",
+            "fields": {"nom": "FEJJARI", "prenom": "HEDI", "date_naissance": "12/03/2003"},
+        },
+    ]
+    result = check_identity_consistency(documents)
+    assert result["consistent"] is False
+    assert "Date de naissance incohérente" in result["issues"][0]
+
+
+def test_unparseable_date_is_ignored_rather_than_falsely_flagged():
+    documents = [
+        {"label": "CIN", "fields": {"nom": "BEN ALI", "prenom": "SALMA", "date_naissance": "illisible"}},
+        {
+            "label": "Acte de naissance",
+            "fields": {"nom": "BEN ALI", "prenom": "SALMA", "date_naissance": "22/09/2002"},
+        },
+    ]
+    result = check_identity_consistency(documents)
+    assert result["consistent"] is True

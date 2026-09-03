@@ -15,6 +15,7 @@ d'admission (rapport §1.5).
 """
 import json
 import os
+import re
 
 _SYSTEM_PROMPT = (
     "Tu es un enseignant d'ESPRIT qui prépare un entretien de sélection pour "
@@ -339,6 +340,38 @@ def generate_quiz_questions(
     return valid[:nb_questions]
 
 
+_ADMISSION_VERDICT_PATTERNS = [
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in [
+        r"tu (?:seras|ne seras pas|es|n'es pas) (?:admis|capable)",
+        r"capable d'obtenir",
+        r"(?:je te |nous te )?recommande\w* (?:la |cette |plut[oô]t la )?sp[ée]cialit[ée]",
+        r"d[ée]cision d'admission",
+        r"\bverdict\b",
+    ]
+]
+
+
+def _strip_admission_verdicts(items) -> list[str]:
+    """Filet de sécurité applicatif (rapport §1.5), en complément du prompt
+    système et du schéma JSON contraint : écarte toute phrase qui
+    ressemblerait à un verdict d'admission ou une recommandation de
+    spécialité, si jamais le LLM ignorait la consigne malgré tout. Filtre
+    heuristique par mots-clés - pas une garantie absolue, le prompt reste la
+    première ligne de défense. Tolère aussi une valeur de forme inattendue
+    (le LLM ne respecte pas toujours le schéma JSON demandé) sans planter :
+    seule une vraie liste de chaînes produit un résultat non vide."""
+    if not isinstance(items, list):
+        return []
+    return [
+        item.strip()
+        for item in items
+        if isinstance(item, str)
+        and item.strip()
+        and not any(pattern.search(item) for pattern in _ADMISSION_VERDICT_PATTERNS)
+    ]
+
+
 def _build_mock_interview_feedback_prompt(profile: dict, qa_pairs: list[dict]) -> str:
     return (
         "Voici le profil du candidat, extrait automatiquement de son dossier de "
@@ -382,8 +415,10 @@ def generate_interview_feedback(
     )
 
     payload = json.loads(raw_text)
+    if not isinstance(payload, dict):
+        payload = {}
     return {
-        "points_forts": payload.get("points_forts", []),
-        "axes_amelioration": payload.get("axes_amelioration", []),
-        "conseils_preparation": payload.get("conseils_preparation", []),
+        "points_forts": _strip_admission_verdicts(payload.get("points_forts")),
+        "axes_amelioration": _strip_admission_verdicts(payload.get("axes_amelioration")),
+        "conseils_preparation": _strip_admission_verdicts(payload.get("conseils_preparation")),
     }

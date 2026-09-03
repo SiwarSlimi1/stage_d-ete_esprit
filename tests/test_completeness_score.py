@@ -78,9 +78,32 @@ def test_empty_dossier_scores_zero_not_a_misleading_floor():
     result = compute_completeness(active_slots, [], CONSISTENT, CONSISTENT, CONSISTENT)
 
     assert result["presence_score"] == 0.0
+    assert result["extraction_score"] == 0.0
+    assert result["coherence_score"] == 0.0
     assert result["score"] == 0.0
     assert result["status"] == "documents_manquants"
     assert set(result["missing_documents"]) == {"CIN", "Bac"}
+
+
+def test_empty_dossier_score_stays_the_weighted_sum_of_its_own_subscores():
+    # Garde-fou : le dict retourné ne doit jamais être auto-contradictoire
+    # (score global bas mais sous-scores à 100%), quel que soit le barème
+    # configuré - même s'il est modifié dans config/settings.py.
+    from config.settings import (
+        COMPLETENESS_WEIGHT_COHERENCE,
+        COMPLETENESS_WEIGHT_EXTRACTION,
+        COMPLETENESS_WEIGHT_PRESENCE,
+    )
+
+    active_slots = [_slot("CIN")]
+    result = compute_completeness(active_slots, [], CONSISTENT, CONSISTENT, CONSISTENT)
+
+    expected = (
+        COMPLETENESS_WEIGHT_PRESENCE * result["presence_score"]
+        + COMPLETENESS_WEIGHT_EXTRACTION * result["extraction_score"]
+        + COMPLETENESS_WEIGHT_COHERENCE * result["coherence_score"]
+    )
+    assert result["score"] == expected
 
 
 def test_no_active_slots_defaults_to_full_presence():

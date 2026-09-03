@@ -196,6 +196,12 @@ if st.button("Générer mes questions d'entretien simulé"):
         if not mock_questions:
             st.warning("Le LLM n'a renvoyé aucune question exploitable. Réessaie.")
         else:
+            # Purge les réponses d'un éventuel jeu de questions précédent :
+            # les widgets text_area sont réutilisés par index (mock_answer_0,
+            # 1...), donc sans ça une régénération réafficherait les anciennes
+            # réponses en face de nouvelles questions.
+            for old_key in [k for k in st.session_state if k.startswith("mock_answer_")]:
+                del st.session_state[old_key]
             st.session_state["mock_questions"] = mock_questions
             st.session_state["mock_feedback"] = None
     except LLMNotConfiguredError as exc:
@@ -233,12 +239,12 @@ if mock_questions:
     feedback = st.session_state.get("mock_feedback")
     if feedback:
         st.markdown("#### Ton retour de préparation")
-        for title, key in [
+        for title, feedback_key in [
             ("Points forts", "points_forts"),
             ("Axes d'amélioration", "axes_amelioration"),
             ("Conseils pour l'entretien réel", "conseils_preparation"),
         ]:
-            if feedback.get(key):
+            if feedback.get(feedback_key):
                 st.markdown(f"**{title}**")
-                for item in feedback[key]:
+                for item in feedback[feedback_key]:
                     st.markdown(f"- {item}")
