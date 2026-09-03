@@ -72,13 +72,13 @@ def test_unrecognized_document_with_no_expected_field_counts_as_zero_extraction(
     assert result["extraction_score"] == 0.0
 
 
-def test_empty_dossier_has_zero_presence_and_extraction_not_penalized_twice():
+def test_empty_dossier_scores_zero_not_a_misleading_floor():
     active_slots = [_slot("CIN"), _slot("Bac")]
 
     result = compute_completeness(active_slots, [], CONSISTENT, CONSISTENT, CONSISTENT)
 
     assert result["presence_score"] == 0.0
-    assert result["extraction_score"] == 1.0  # rien à extraire, déjà couvert par presence_score
+    assert result["score"] == 0.0
     assert result["status"] == "documents_manquants"
     assert set(result["missing_documents"]) == {"CIN", "Bac"}
 
