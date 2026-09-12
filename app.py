@@ -306,10 +306,12 @@ if st.button("Générer les questions d'entretien", disabled=not can_generate):
             st.markdown(f"**{i}.** {question}")
     except LLMNotConfiguredError as exc:
         st.warning(str(exc))
-    except ImportError:
+    except ImportError as exc:
+        # exc.name donne le module manquant : peut être `openai` lui-même, mais
+        # aussi une de ses dépendances (ex. httpx) absente de l'environnement.
         st.warning(
-            "Le paquet `openai` n'est pas installé. Lancez `pip install openai` "
-            "dans l'environnement du projet."
+            f"Dépendance manquante ({exc.name or exc}) pour les appels LLM. Lancez "
+            "`pip install -r requirements.txt` dans l'environnement du projet."
         )
     except Exception as exc:  # noqa: BLE001 - affichage direct de l'erreur API pour le debug en démo
         st.error(f"Échec de l'appel au LLM : {exc}")

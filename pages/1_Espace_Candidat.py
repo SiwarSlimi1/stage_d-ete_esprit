@@ -126,8 +126,11 @@ if st.button("Générer mon quiz"):
             st.session_state["quiz_submitted"] = False
     except LLMNotConfiguredError as exc:
         st.warning(str(exc))
-    except ImportError:
-        st.warning("Le paquet `openai` n'est pas installé. Lancez `pip install openai`.")
+    except ImportError as exc:
+        st.warning(
+            f"Dépendance manquante ({exc.name or exc}) pour les appels LLM. Lancez "
+            "`pip install -r requirements.txt`."
+        )
     except Exception as exc:  # noqa: BLE001 - affichage direct de l'erreur API pour le debug en démo
         st.error(f"Échec de l'appel au LLM : {exc}")
 
@@ -206,8 +209,11 @@ if st.button("Générer mes questions d'entretien simulé"):
             st.session_state["mock_feedback"] = None
     except LLMNotConfiguredError as exc:
         st.warning(str(exc))
-    except ImportError:
-        st.warning("Le paquet `openai` n'est pas installé. Lancez `pip install openai`.")
+    except ImportError as exc:
+        st.warning(
+            f"Dépendance manquante ({exc.name or exc}) pour les appels LLM. Lancez "
+            "`pip install -r requirements.txt`."
+        )
     except Exception as exc:  # noqa: BLE001 - affichage direct de l'erreur API pour le debug en démo
         st.error(f"Échec de l'appel au LLM : {exc}")
 
@@ -231,8 +237,11 @@ if mock_questions:
             st.session_state["mock_feedback"] = feedback
         except LLMNotConfiguredError as exc:
             st.warning(str(exc))
-        except ImportError:
-            st.warning("Le paquet `openai` n'est pas installé. Lancez `pip install openai`.")
+        except ImportError as exc:
+            st.warning(
+                f"Dépendance manquante ({exc.name or exc}) pour les appels LLM. Lancez "
+                "`pip install -r requirements.txt`."
+            )
         except Exception as exc:  # noqa: BLE001 - affichage direct de l'erreur API pour le debug en démo
             st.error(f"Échec de l'appel au LLM : {exc}")
 

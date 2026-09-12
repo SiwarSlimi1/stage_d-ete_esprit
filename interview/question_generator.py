@@ -140,8 +140,16 @@ def _build_user_prompt(profile: dict, nb_questions: int) -> str:
 # Fournisseurs LLM pris en charge : variable d'environnement attendue et modèle
 # par défaut. Groq est recommandé en priorité : gratuit, sans carte bancaire,
 # et sans le problème de quota "limit: 0" par modèle observé sur certains
-# comptes Gemini (30 req/min, 14 400 req/jour au niveau du compte - largement
+# comptes Gemini (30 req/min, 1000 req/jour au niveau du compte - largement
 # suffisant pour ce POC).
+#
+# groq: "llama-3.3-70b-versatile" et "llama-3.1-8b-instant" sont passés en
+# accès Enterprise uniquement chez Groq (retirés du palier gratuit après la
+# rédaction initiale de ce module - vérifié le 12/09/2026 sur
+# console.groq.com/docs/models et /docs/rate-limits, page "Free Plan
+# Limits") : un appel avec l'ancien modèle échoue avec l'erreur API
+# "model_not_found" même avec une clé valide. "openai/gpt-oss-20b" reste
+# disponible sur le palier gratuit.
 _PROVIDER_ENV_VAR = {
     "openai": "OPENAI_API_KEY",
     "gemini": "GEMINI_API_KEY",
@@ -150,7 +158,7 @@ _PROVIDER_ENV_VAR = {
 _PROVIDER_DEFAULT_MODEL = {
     "openai": "gpt-4o-mini",
     "gemini": "gemini-2.0-flash",
-    "groq": "llama-3.3-70b-versatile",
+    "groq": "openai/gpt-oss-20b",
 }
 
 
